@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">h
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TOKAI RWA — Laboratorio de Tokenización de Activos Reales</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
@@ -54,7 +54,7 @@
 
   .pg{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
   .pc{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px 22px}
-  .pn{font-size:44px;font-weight:900;color:rgba(0,214,126,.08);line-height:1;margin-bottom:12px}.pc h4{font-size:14px;font-weight:700;margin-bottom>8px}.pc p{font-size:12px;color:var(--gray);font-weight:300;line-height:1.7}
+  .pn{font-size:44px;font-weight:900;color:rgba(0,214,126,.08);line-height:1;margin-bottom:12px}.pc h4{font-size:14px;font-weight:700;margin-bottom:8px}.pc p{font-size:12px;color:var(--gray);font-weight:300;line-height:1.7}
 
   #consulta{padding:100px 40px;max-width:860px;margin:0 auto;position:relative;z-index:1}
   .ci{text-align:center;margin-bottom:40px}.ci .sd{margin-left:auto;margin-right:auto}
@@ -88,7 +88,7 @@
   @keyframes bounce{0%,60%,100%{opacity:.25;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
 
   @media(max-width:900px){nav{padding:0 20px}.nl{display:none}.sg,.pg{grid-template-columns:1fr}.vg{grid-template-columns:1fr}.hero{padding:100px 24px 60px}.sec{padding:60px 24px}#consulta{padding:60px 24px}.hb{flex-direction:column;width:100%;max-width:320px;margin:0 auto}.bm,.bg{width:100%;text-align:center}.hwm{flex-wrap:wrap;gap:8px}}
-  @media(max-width:600px){.sh .bl{width:24px;height:24px}.st{font-size:52px}.cmsg{height:360py}}
+  @media(max-width:600px){.sh .bl{width:24px;height:24px}.st{font-size:52px}.cmsg{height:360px}}
 </style>
 </head>
 <body>
@@ -168,14 +168,15 @@
 <script>
 const B=document.getElementById('chatBody'),I=document.getElementById('chatInput'),S=document.getElementById('sendBtn'),Q=document.getElementById('quickArea');
 let H=[],busy=false;
-function aM(h,u){const d=document.createElement('div');d.className='msg '+(u?'msg-user':'msg-ai');d.innerHTML=h;B.appendChild(d);B.scrollTop=B.scrollHeight}
+function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function aM(h,u){const d=document.createElement('div');d.className='msg '+(u?'msg-user':'msg-ai');if(u){d.textContent=h;}else{d.innerHTML=h;}B.appendChild(d);B.scrollTop=B.scrollHeight}
 function sD(){const d=document.createElement('div');d.className='td-wrap';d.id='dots';d.innerHTML='<div class="td"></div><div class="td"></div><div class="td"></div>';B.appendChild(d);B.scrollTop=B.scrollHeight}
 function hD(){const e=document.getElementById('dots');if(e)e.remove()}
-function fR(t){return t.replace(/\*\*(.*?)\*\*/g,'<b>$1</b>').replace(/\*(.*?)\*/g,'<em>$1</em>').replace(/\n\n/g,'<br><br>').replace(/\n- /g,'<br>· ').replace(/\n(\d+)\. /g,'<br>$1. ').replace(/\n/g,'<br>')}
+function fR(t){return esc(t).replace(/\*\*(.*?)\*\*/g,'<b>$1</b>').replace(/\*(.*?)\*/g,'<em>$1</em>').replace(/\n\n/g,'<br><br>').replace(/\n- /g,'<br>· ').replace(/\n(\d+)\. /g,'<br>$1. ').replace(/\n/g,'<br>')}
 function qS(e){I.value=e.textContent;Q.style.display='none';send()}
 async function send(){const t=I.value.trim();if(!t||busy)return;busy=true;S.disabled=true;I.value='';Q.style.display='none';aM(t,true);H.push({role:'user',content:t});sD();
 try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:H})});const d=await r.json();hD();
-if(r.ok&&d.reply){aM(fR(d.reply),false);H.push({role:'assistant',content:d.reply})}else{aM('<b>Error:</b> '+(d.error||'Servicio no disponible.'),false);H.pop()}}
+if(r.ok&&d.reply){aM(fR(d.reply),false);H.push({role:'assistant',content:d.reply})}else{aM('<b>Error:</b> '+esc(d.error||'Servicio no disponible.'),false);H.pop()}}
 catch(e){hD();aM('<b>Error de conexión.</b> Verificá tu conexión e intentá de nuevo.',false);H.pop()}
 busy=false;S.disabled=false;I.focus()}
 </script>
