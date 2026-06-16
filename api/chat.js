@@ -1,3 +1,7 @@
+const rateLimit = new Map();
+const RATE_LIMIT = 10;
+const RATE_WINDOW = 60 * 1000;
+
 export default async function handler(req, res) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -5,6 +9,15 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
+
+  // Rate limiting
+  const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || 'unknown';
+  const now = Date.now();
+  const entry = rateLimit.get(ip) || { count: 0, start: now };
+  if (now - entry.start > RATE_WINDOW) { entry.count = 0; entry.start = now; }
+  entry.count++;
+  rateLimit.set(ip, entry);
+  if (entry.count > RATE_LIMIT) return res.status(429).json({ error: 'Demasiadas solicitudes. Esperá un momento.' });
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: 'API key no configurada' });
@@ -14,6 +27,13 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Formato inválido' });
   }
 
+  // Validate message content
+  for (const msg of messages) {
+    if (!msg.role || !msg.content || typeof msg.content !== 'string' || msg.content.length > 2000) {
+      return res.status(400).json({ error: 'Mensaje inválido' });
+    }
+  }
+
   const SYSTEM = `Sos un asistente educativo de TOKAI RWA, un laboratorio especializado en estructuración y tokenización de activos reales.
 
 Tu rol es responder consultas generales sobre tokenización: qué es, cómo funciona, qué activos se pueden tokenizar, marcos regulatorios, tecnología blockchain, estándares de tokens, etc.
@@ -21,7 +41,7 @@ Tu rol es responder consultas generales sobre tokenización: qué es, cómo func
 IMPORTANTE:
 - Respondés preguntas INFORMATIVAS y EDUCATIVAS sobre tokenización en general.
 - NO armás proyectos, no hacés análisis financieros específicos, no estructurás emisiones.
-- Si alguien quiere armar un proyecto o necesita estructuración, indicale que contacte al laboratorio TOKAI RWA directamente en contacto@tokai.com.
+- Si alguien quiere armar un proyecto o necesita estructuración, indicale que contacte al laboratorio TOKAI RWA directamente en tokairwa@gmail.com.
 - Respondés en español rioplatense, tono profesional pero accesible.
 - Respuestas claras y concisas: 2-3 párrafos para preguntas simples.
 - Podés explicar conceptos como: tokenización, security tokens, utility tokens, ERC-3643, ERC-4626, MiCA, Howey Test, CNV, fideicomiso financiero, waterfall, LTV, etc.
