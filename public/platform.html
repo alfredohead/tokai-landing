@@ -13,6 +13,42 @@ const CAT = { 1:'Retail', 2:'Calificado', 3:'Institucional' };
 /* ─── Estado inicial de la cadena (refleja deployment-amoy.json) ─── */
 function genAddr(seed){ let s=0; for(const c of seed) s=(s*31+c.charCodeAt(0))>>>0; let hex=''; for(let i=0;i<40;i++){ s=(s*1103515245+12345)>>>0; hex+=(s%16).toString(16);} return '0x'+hex; }
 
+/* ─── Mapeo backend (snake_case) → frontend (camelCase) ─── */
+function mapBackendProject(p){
+  return {
+    id:              p.id,
+    name:            p.name,
+    symbol:          p.symbol,
+    vertical:        p.vertical,
+    assetType:       p.asset_type,
+    regime:          p.regime,
+    maxSupply:       Number(p.max_supply),
+    totalSupply:     Number(p.total_supply),
+    raised:          Number(p.raised),
+    priceUsdCents:   p.price_usd_cents,
+    color:           p.color || '#1a4d8f',
+    ronda:           p.ronda,
+    thesis:          p.thesis,
+    thesisStatus:    p.thesis_status,
+    jurisdictions:   p.jurisdictions || [32],
+    soulbound:       p.is_soulbound,
+    lockupDays:      p.lockup_days,
+    maxHolders:      p.max_holders,
+    yieldMechanism:  p.yield_mechanism,
+    yieldAnnualPct:  Number(p.yield_annual_pct),
+    valuationUsd:    Number(p.valuation_usd),
+    desc:            p.description || '',
+    checklist:       p.checklist,
+    emissionEnabled: p.emission_enabled,
+    emissionPaused:  p.emission_paused,
+    meta:            p.meta,
+    created_at:      p.created_at,
+    token:           genAddr(p.symbol),
+    compliance:      genAddr(p.symbol + 'c'),
+    banner:          'linear-gradient(135deg,' + (p.color || '#1a4d8f') + '33,' + (p.color || '#1a4d8f') + ')',
+  };
+}
+
 const INITIAL_PROJECTS = [
   { id:0, name:'Grand Alyson Token', symbol:'GAT', vertical:'Inmobiliario',
     desc:'Complejo de uso mixto 12.064 m² · San Martín, Mendoza', token:genAddr('GAT'),
@@ -98,7 +134,7 @@ const I = {
    MOTOR DE CADENA SIMULADO — refleja exactamente IdentityRegistry +
    ModularCompliance + TOKAIToken (verificado contra 9 tests EVM).
    ════════════════════════════════════════════════════════════════════ */
-function useChain(){
+function useChain(opts){
   const [identities, setIdentities] = useState({});       // addr -> {verified,jur,cat,verifiedAt,hash}
   const [projects, setProjects] = useState(INITIAL_PROJECTS);
   const [balances, setBalances] = useState({});           // `${pid}:${addr}` -> amount
@@ -110,6 +146,22 @@ function useChain(){
   const [now, setNow] = useState(Date.now());
   const [blockedJurisdictions, setBlockedJurisdictions] = useState([840]); // EE.UU. (840) por defecto
   
+  /* ── Carga proyectos del backend al iniciar sesión ── */
+  useEffect(function(){
+    if(!opts || !opts.jwt || !opts.apiUrl) return;
+    fetch(opts.apiUrl + '/api/v1/projects', {
+      headers: { 'Authorization': 'Bearer ' + opts.jwt }
+    })
+    .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
+    .then(function(data){
+      if(Array.isArray(data.projects) && data.projects.length > 0){
+        var mapped = data.projects.map(mapBackendProject);
+        setProjects(mapped);
+      }
+    })
+    .catch(function(){}); // silencioso — mantiene INITIAL_PROJECTS como fallback
+  }, [opts && opts.jwt]);
+
   function toggleJurisdictionBlock(jurCode){
     setBlockedJurisdictions(s => s.includes(jurCode) ? s.filter(c => c !== jurCode) : [...s, jurCode]);
     log('GeofencingUpdate', `Jurisdicción ${JUR[jurCode]} ${blockedJurisdictions.includes(jurCode) ? 'HABILITADA' : 'RESTRINGIDA'}`);
@@ -242,18 +294,53 @@ function useChain(){
     return {ok:true};
   }
 
-  function createProject(cfg){
+  async function createProject(cfg){
+    // actualización optimista inmediata
     const id = projects.length;
     const p = {id,...cfg,token:genAddr(cfg.symbol+id),compliance:genAddr(cfg.symbol+'c'+id),totalSupply:0,raised:0,
       banner:`linear-gradient(135deg,${cfg.color||'#1a4d8f'}33,${cfg.color||'#1a4d8f'})`};
     setProjects(ps=>[...ps,p]);
     log('ProjectCreated', `${cfg.name} (${cfg.symbol})`);
+
+    // persistir en backend si hay sesión
+    if(opts && opts.jwt && opts.apiUrl){
+      try{
+        const res = await fetch(opts.apiUrl + '/api/v1/projects', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json','Authorization':'Bearer '+opts.jwt},
+          body: JSON.stringify({
+            name: cfg.name, symbol: cfg.symbol, vertical: cfg.vertical,
+            regime: cfg.regime || 'RG 1088', maxSupply: cfg.supplyMax || cfg.maxSupply || 0,
+            priceUsdCents: cfg.priceUsd ? Math.round(cfg.priceUsd * 100) : (cfg.priceUsdCents || 0),
+            assetType: cfg.assetType, yieldMechanism: cfg.yieldMechanism,
+            yieldAnnualPct: cfg.yieldAnnualPct || 0, valuationUsd: cfg.valuationUsd || 0,
+            description: cfg.desc || '', isSoulbound: cfg.soulbound || false,
+            lockupDays: cfg.lockupDays || 0, maxHolders: cfg.maxHolders || 0,
+            jurisdictions: cfg.jurisdictions || [32], color: cfg.color || '#1a4d8f',
+          })
+        });
+        if(res.ok){
+          const data = await res.json();
+          // reemplazar el item optimista con el del backend (tiene UUID real)
+          setProjects(ps => ps.map(x => x.id === id ? {...mapBackendProject(data.project), totalSupply:0, raised:0} : x));
+        }
+      } catch(e){ /* mantiene el estado optimista */ }
+    }
     return id;
   }
 
-  function updateProject(id, patch){
+  async function updateProject(id, patch){
     setProjects(ps=>ps.map(p=>p.id===id?{...p,...patch}:p));
-    log('ProjectUpdated', `Proyecto #${id} actualizado`);
+    log('ProjectUpdated', `Proyecto ${id} actualizado`);
+    if(opts && opts.jwt && opts.apiUrl){
+      try{
+        await fetch(opts.apiUrl + '/api/v1/projects/' + id, {
+          method: 'PATCH',
+          headers: {'Content-Type':'application/json','Authorization':'Bearer '+opts.jwt},
+          body: JSON.stringify(patch)
+        });
+      } catch(e){}
+    }
   }
 
   // Gate de gobernanza de emisión (demo — refleja lógica del contrato)
@@ -1524,7 +1611,10 @@ function TokaiView({chain,toast,subView,go}){
               h('span',{style:{fontSize:10.5,fontWeight:600,color:'var(--txt-dim)'}},rn)),
             enRonda.map(p=>h('div',{key:p.id,style:{padding:'7px 9px',background:'var(--panel)',borderRadius:7,marginBottom:6,borderLeft:'2px solid '+(p.color)}},
               h('div',{style:{fontSize:11.5,fontWeight:600}},p.symbol),
-              h('div',{style:{fontSize:9.5,color:'var(--txt-mute)'}},p.vertical))),
+              h('div',{style:{fontSize:9.5,color:'var(--txt-mute)'}},p.vertical),
+              h('div',{style:{display:'flex',gap:3,marginTop:5}},
+                ronda>1&&h('button',{title:'Ronda anterior',onClick:()=>chain.updateProject(p.id,{ronda:ronda-1}),style:{fontSize:9,padding:'1px 5px',borderRadius:4,border:'1px solid var(--line-solid)',background:'none',color:'var(--txt-mute)',cursor:'pointer'}},'←'),
+                ronda<6&&h('button',{title:'Siguiente ronda',onClick:()=>chain.updateProject(p.id,{ronda:ronda+1}),style:{fontSize:9,padding:'1px 5px',borderRadius:4,border:'1px solid var(--line-solid)',background:'none',color:'var(--emerald)',cursor:'pointer'}},'→')))),
             enRonda.length===0&&h('div',{style:{fontSize:10,color:'var(--txt-mute)',textAlign:'center',paddingTop:14}},'—'));
         })),
       h('h2',{style:{fontSize:17,fontWeight:700,marginBottom:14}},'Supervisión de compliance'),
@@ -2419,7 +2509,22 @@ function ThesisFlexEditor({chain, toast, go}){
   function save(newBlocks, newState){
     const b = newBlocks||blocks;
     const s = newState||thesisState;
-    if(chain.updateProject) chain.updateProject(pid, {thesis:{blocks:b,estado:s,confirmedAt:null,confirmHash:null,revisionComment:''}});
+    const thesisData = {blocks:b,estado:s,confirmedAt:null,confirmHash:null,revisionComment:''};
+    if(chain.updateProject) chain.updateProject(pid, {thesis:thesisData});
+    // Persistir tesis en backend
+    const p2 = chain.projects&&chain.projects[pid];
+    if(p2 && p2.id && typeof p2.id === 'string' && p2.id.length === 36){
+      const jwt = localStorage.getItem('tokai_jwt');
+      const apiUrl = window.__API_URL__ || '';
+      if(jwt && apiUrl){
+        const backendStatus = s === 'enviada' ? 'sent' : s === 'confirmada' ? 'confirmed' : 'draft';
+        fetch(apiUrl + '/api/v1/projects/' + p2.id + '/thesis', {
+          method: 'PUT',
+          headers: {'Content-Type':'application/json','Authorization':'Bearer '+jwt},
+          body: JSON.stringify({thesis: thesisData, status: backendStatus})
+        }).catch(function(){});
+      }
+    }
   }
 
   /* ─── operaciones de bloque ─── */
@@ -2719,6 +2824,18 @@ function ThesisClientView({chain, toast}){
             const hash='0x'+Math.random().toString(16).slice(2,18)+'…';
             const newThesis={...thesis,estado:'confirmada',confirmedAt:Date.now(),confirmHash:hash};
             if(chain.updateProject)chain.updateProject(p.id,{thesis:newThesis});
+            // Persistir confirmación en backend
+            if(p.id && typeof p.id === 'string' && p.id.length === 36){
+              const jwt = localStorage.getItem('tokai_jwt');
+              const apiUrl = window.__API_URL__ || '';
+              if(jwt && apiUrl){
+                fetch(apiUrl + '/api/v1/projects/' + p.id + '/thesis', {
+                  method: 'PUT',
+                  headers: {'Content-Type':'application/json','Authorization':'Bearer '+jwt},
+                  body: JSON.stringify({thesis: newThesis, status: 'confirmed'})
+                }).catch(function(){});
+              }
+            }
             toast&&toast({title:'Tesis confirmada',msg:'Sellada. La emisión puede habilitarse.'});
           }},'Confirmar y habilitar emisión →'),
           h('button',{className:'btn btn-ghost btn-sm',onClick:()=>setShowRev(!showRev)},'Solicitar revisión')),
@@ -4753,7 +4870,9 @@ function AdminAccesos({ chain, toast }) {
    APP SHELL v3 — login dual · modo simple/experto · router
    ════════════════════════════════════════════════════════════════════ */
 function App(){
-  const sim = useChain();
+  const jwt = localStorage.getItem('tokai_jwt');
+  const apiUrl = window.__API_URL__ || '';
+  const sim = useChain({jwt, apiUrl});
   const web3 = (typeof useWeb3==='function') ? useWeb3() : { available:false };
   const live = (typeof useChainWeb3==='function') ? useChainWeb3(web3.account) : null;
   const isLive = !!(web3.account && web3.chainOk && (typeof window!=='undefined') && window.__DEPLOYMENT__ && live);
