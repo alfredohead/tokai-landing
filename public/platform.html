@@ -385,10 +385,8 @@ function useChain(opts){
   
   /* ── Carga proyectos del backend al iniciar sesión ── */
   useEffect(function(){
-    if(!opts || !opts.jwt || !opts.apiUrl) return;
-    fetch(opts.apiUrl + '/api/v1/projects', {
-      headers: { 'Authorization': 'Bearer ' + opts.jwt }
-    })
+    if(!opts || !opts.apiUrl || !opts.loggedIn) return;
+    fetch(opts.apiUrl + '/api/v1/projects', { credentials: 'include' })
     .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
     .then(function(data){
       if(Array.isArray(data.projects) && data.projects.length > 0){
@@ -397,7 +395,7 @@ function useChain(opts){
       }
     })
     .catch(function(){}); // silencioso — mantiene INITIAL_PROJECTS como fallback
-  }, [opts && opts.jwt]);
+  }, [opts && opts.loggedIn]);
 
   function toggleJurisdictionBlock(jurCode){
     setBlockedJurisdictions(s => s.includes(jurCode) ? s.filter(c => c !== jurCode) : [...s, jurCode]);
@@ -544,7 +542,8 @@ function useChain(opts){
       try{
         const res = await fetch(opts.apiUrl + '/api/v1/projects', {
           method: 'POST',
-          headers: {'Content-Type':'application/json','Authorization':'Bearer '+opts.jwt},
+          credentials: 'include',
+          headers: {'Content-Type':'application/json'},
           body: JSON.stringify({
             name: cfg.name, symbol: cfg.symbol, vertical: cfg.vertical,
             regime: cfg.regime || 'RG 1088', maxSupply: cfg.supplyMax || cfg.maxSupply || 0,
@@ -573,7 +572,8 @@ function useChain(opts){
       try{
         await fetch(opts.apiUrl + '/api/v1/projects/' + id, {
           method: 'PATCH',
-          headers: {'Content-Type':'application/json','Authorization':'Bearer '+opts.jwt},
+          credentials: 'include',
+        headers: {'Content-Type':'application/json'},
           body: JSON.stringify(patch)
         });
       } catch(e){}
@@ -2131,7 +2131,6 @@ function LoginGate({onLogin, web3, toast}){
         });
         const data = await res.json();
         if(!res.ok) { setError(data.message || 'Código incorrecto.'); setSending(false); return; }
-        localStorage.setItem('tokai_jwt', data.token);
         setSending(false);
         setError('');
         const backendRole = data.user.role;
@@ -2695,10 +2694,10 @@ function ThesisBadge({estado}){
 /* ─── Llamada al proxy de IA (backend protegido) ─── */
 async function callTokaiAgent(userMsg, projectContext){
   const context = `PROYECTO: ${projectContext.name||''} | Vertical: ${projectContext.vertical||''} | Régimen: ${projectContext.regime||''} | Mecanismo: ${projectContext.yieldMechanism||''} | Valuación: USD ${(projectContext.valuationUsd||0).toLocaleString()} | Desc: ${(projectContext.desc||'').slice(0,200)}`;
-  const jwt = localStorage.getItem('tokai_jwt');
   const res = await fetch((window.__API_URL__||'')+'/api/v1/ai/chat',{
     method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+jwt},
+    credentials:'include',
+    headers:{'Content-Type':'application/json'},
     body:JSON.stringify({mode:'tokai', messages:[{role:'user',content:userMsg}], context})
   });
   if(!res.ok) return 'Error al conectar con el agente.';
@@ -2751,13 +2750,13 @@ function ThesisFlexEditor({chain, toast, go}){
     // Persistir tesis en backend
     const p2 = chain.projects&&chain.projects[pid];
     if(p2 && p2.id && typeof p2.id === 'string' && p2.id.length === 36){
-      const jwt = localStorage.getItem('tokai_jwt');
       const apiUrl = window.__API_URL__ || '';
-      if(jwt && apiUrl){
+      if(apiUrl){
         const backendStatus = s === 'enviada' ? 'sent' : s === 'confirmada' ? 'confirmed' : 'draft';
         fetch(apiUrl + '/api/v1/projects/' + p2.id + '/thesis', {
           method: 'PUT',
-          headers: {'Content-Type':'application/json','Authorization':'Bearer '+jwt},
+          credentials: 'include',
+          headers: {'Content-Type':'application/json'},
           body: JSON.stringify({thesis: thesisData, status: backendStatus})
         }).catch(function(){});
       }
@@ -3063,12 +3062,12 @@ function ThesisClientView({chain, toast}){
             if(chain.updateProject)chain.updateProject(p.id,{thesis:newThesis});
             // Persistir confirmación en backend
             if(p.id && typeof p.id === 'string' && p.id.length === 36){
-              const jwt = localStorage.getItem('tokai_jwt');
               const apiUrl = window.__API_URL__ || '';
-              if(jwt && apiUrl){
+              if(apiUrl){
                 fetch(apiUrl + '/api/v1/projects/' + p.id + '/thesis', {
                   method: 'PUT',
-                  headers: {'Content-Type':'application/json','Authorization':'Bearer '+jwt},
+                  credentials: 'include',
+                  headers: {'Content-Type':'application/json'},
                   body: JSON.stringify({thesis: newThesis, status: 'confirmed'})
                 }).catch(function(){});
               }
@@ -3098,10 +3097,10 @@ function ThesisClientView({chain, toast}){
    Motor compartido de chat (usado por ambos asistentes)
    ─────────────────────────────────────────────────────────────── */
 async function sendToAI(mode, history, context) {
-  const jwt = localStorage.getItem('tokai_jwt');
   const res = await fetch((window.__API_URL__||'')+'/api/v1/ai/chat', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer '+jwt},
+    credentials: 'include',
+    headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
       mode: mode,
       messages: history.map(function(m){ return {role:m.role, content:String(m.content).slice(0,3000)}; }),
@@ -3368,10 +3367,10 @@ function buildParamsFromProject(p) {
 /* ─── Llamada IA al proxy seguro ─── */
 async function callEmissionAI(prompt, projectContext) {
   const context = `PROYECTO: ${projectContext.name||''} | ${projectContext.vertical||''} | ${projectContext.regime||''} | supply=${projectContext.maxSupply||''} | price=USD${(projectContext.priceUsdCents||0)/100}`;
-  const jwt = localStorage.getItem('tokai_jwt');
   const res = await fetch((window.__API_URL__||'')+'/api/v1/ai/chat', {
     method: 'POST',
-    headers: {'Content-Type':'application/json','Authorization':'Bearer '+jwt},
+    credentials: 'include',
+    headers: {'Content-Type':'application/json'},
     body: JSON.stringify({mode:'emission', messages:[{role:'user',content:prompt}], context})
   });
   if(!res.ok) return {contractType:'TOKAIToken', params:{}, warnings:['Error al conectar con la IA'], explanation:''};
@@ -3638,10 +3637,10 @@ El reporte debe cubrir:
 
 Formato: Markdown con encabezados claros. Usá tablas para datos financieros. Tono institucional, rioplatense. Las proyecciones van con supuestos explícitos — nunca garantizás retornos.`;
 
-      const jwt = localStorage.getItem('tokai_jwt');
       const res = await fetch((window.__API_URL__||'')+'/api/v1/ai/chat', {
         method:'POST',
-        headers:{'Content-Type':'application/json','Authorization':'Bearer '+jwt},
+        credentials:'include',
+        headers:{'Content-Type':'application/json'},
         body: JSON.stringify({mode:'report', messages:[{role:'user',content:ctx}], context:ctx.slice(0,800)})
       });
       if(!res.ok){ toast&&toast({type:'err',title:'Error',msg:'No se pudo conectar con la IA.'}); setGenerating(false); return; }
@@ -5107,9 +5106,8 @@ function AdminAccesos({ chain, toast }) {
    APP SHELL v3 — login dual · modo simple/experto · router
    ════════════════════════════════════════════════════════════════════ */
 function App(){
-  const jwt = localStorage.getItem('tokai_jwt');
   const apiUrl = window.__API_URL__ || '';
-  const sim = useChain({jwt, apiUrl});
+  const sim = useChain({apiUrl, loggedIn: !!auth});
   const web3 = (typeof useWeb3==='function') ? useWeb3() : { available:false };
   const live = (typeof useChainWeb3==='function') ? useChainWeb3(web3.account) : null;
   const isLive = !!(web3.account && web3.chainOk && (typeof window!=='undefined') && window.__DEPLOYMENT__ && live);
@@ -5198,13 +5196,11 @@ function App(){
     }
   }
 
-  /* ── Restore de sesión desde JWT guardado en localStorage ── */
+  /* ── Restore de sesión desde cookie HttpOnly ── */
   useEffect(()=>{
-    const jwt = localStorage.getItem('tokai_jwt');
-    if(!jwt || !window.__API_URL__) return;
-    fetch(window.__API_URL__ + '/auth/me', {
-      headers: { 'Authorization': 'Bearer ' + jwt }
-    }).then(r => r.ok ? r.json() : Promise.reject()).then(data => {
+    if(!window.__API_URL__) return;
+    fetch(window.__API_URL__ + '/auth/me', { credentials: 'include' })
+    .then(r => r.ok ? r.json() : Promise.reject()).then(data => {
       if(!data.id) return;
       const backendRole = data.role;
       const frontRole = backendRole === 'admin' ? 'tokai' : backendRole;
@@ -5214,7 +5210,7 @@ function App(){
       if(isAdmin){ setRole('tokai'); setUiMode('expert'); setView('tokai'); }
       else if(approved){ setRole('issuer'); setUiMode('simple'); setView('home'); setPaid(true); }
       else { setRole('issuer'); setUiMode('simple'); setView('home'); setPaid(false); }
-    }).catch(()=>{ localStorage.removeItem('tokai_jwt'); });
+    }).catch(()=>{}); // sin sesión activa
   },[]);
 
   if(!auth) return h(LoginGate,{onLogin:(a)=>{
@@ -5279,7 +5275,7 @@ function App(){
               h('button',{className:'role-btn active',onClick:()=>switchMode('simple')},'Simple'),
               h('button',{className:'role-btn',onClick:()=>switchMode('expert')},'Experto')),
             h('div',{className:'wallet-chip'},h('span',{className:'dot'}),auth.label||short(wallet.addr)),
-            h('button',{className:'btn btn-ghost btn-sm',onClick:()=>{localStorage.removeItem('tokai_jwt');setAuth(null);setView('home');}},'Salir'))
+            h('button',{className:'btn btn-ghost btn-sm',onClick:async()=>{ if(window.__API_URL__) await fetch(window.__API_URL__+'/auth/logout',{method:'POST',credentials:'include'}).catch(()=>{}); setAuth(null);setView('home'); }},'Salir'))
         ),
         h('div',{className:'content'},
           view==='home'&&h(HomeEmisor,{chain,auth,go,wallet,connectWallet:()=>web3.connect&&web3.connect()}),
