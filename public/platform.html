@@ -214,23 +214,6 @@
   .menu-btn{display:none;width:36px;height:36px;border-radius:9px;background:var(--panel);border:1px solid var(--line-solid);align-items:center;justify-content:center}
   @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
-<!-- TOKAI-PROTECT -->
-<meta name="copyright" content="2025 TOKAI RWA - Todos los derechos reservados">
-<script>
-(function(){
-  if(window.console){
-    console.log("%cTOKAI RWA","font-size:20px;font-weight:900;color:#00D67E;background:#0A0A0A;padding:6px 14px;border-radius:6px");
-    console.log("%c(c) 2025 TOKAI RWA. Todos los derechos reservados.","color:#aaa;font-size:12px");
-    console.log("%cSoftware propietario. Reproduccion no autorizada prohibida. Ley 11.723 (ARG).","color:#555;font-size:11px");
-  }
-  document.addEventListener("contextmenu",function(e){e.preventDefault();return false;});
-  document.addEventListener("keydown",function(e){
-    var k=e.key?e.key.toLowerCase():"";
-    if((e.ctrlKey||e.metaKey)&&(k==="u"||k==="s")){e.preventDefault();return false;}
-  },true);
-  document.addEventListener("dragstart",function(e){if(e.target.tagName==="IMG")e.preventDefault();});
-})();
-</script>
 </head>
 <body>
 <div id="root"></div>
@@ -1963,12 +1946,8 @@ function GuideView({chain, role, go, setRole}){
    ════════════════════════════════════════════════════════════════════ */
 
 /* ---------- LoginGate: email (Web2) o wallet ---------- */
-/* ── Emails autorizados como TOKAI admin (en producción: verificar contra backend) ── */
-var TOKAI_ADMIN_EMAILS = [
-  'sozzialfredo@gmail.com',
-  'tokairwa@gmail.com',
-  'waniaxarg@gmail.com',
-];
+/* ── Admin role asignado por el backend según JWT (no hardcodeado en frontend) ── */
+var TOKAI_ADMIN_EMAILS = [];
 
 /* ── Emails de emisores aprobados (persistidos en localStorage por TOKAI) ── */
 function getApprovedEmitters() {
@@ -2866,21 +2845,18 @@ function ThesisBadge({estado}){
   return h('span',{style:{display:'inline-block',padding:'3px 10px',borderRadius:20,fontSize:11,fontWeight:700,background:cfg.c+'20',color:cfg.c,border:'1px solid '+cfg.c+'50'}},cfg.label);
 }
 
-/* ─── Llamada a la API de Anthropic ─── */
+/* ─── Llamada al proxy de IA (backend protegido) ─── */
 async function callTokaiAgent(userMsg, projectContext){
-  const contextStr = `PROYECTO: ${projectContext.name} | Vertical: ${projectContext.vertical} | Régimen: ${projectContext.regime} | Mecanismo: ${projectContext.yieldMechanism} | Valuación: USD ${(projectContext.valuationUsd||0).toLocaleString()} | Desc: ${projectContext.desc||''}`;
-  const res = await fetch('https://api.anthropic.com/v1/messages',{
+  const context = `PROYECTO: ${projectContext.name||''} | Vertical: ${projectContext.vertical||''} | Régimen: ${projectContext.regime||''} | Mecanismo: ${projectContext.yieldMechanism||''} | Valuación: USD ${(projectContext.valuationUsd||0).toLocaleString()} | Desc: ${(projectContext.desc||'').slice(0,200)}`;
+  const jwt = localStorage.getItem('tokai_jwt');
+  const res = await fetch((window.__API_URL__||'')+'/api/v1/ai/chat',{
     method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      model:'claude-sonnet-4-6',
-      max_tokens:1000,
-      system: TOKAI_AGENT_PROMPT + '\n\nCONTEXTO DEL PROYECTO ACTUAL:\n' + contextStr,
-      messages:[{role:'user',content:userMsg}]
-    })
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+jwt},
+    body:JSON.stringify({mode:'tokai', messages:[{role:'user',content:userMsg}], context})
   });
+  if(!res.ok) return 'Error al conectar con el agente.';
   const data = await res.json();
-  return data?.content?.[0]?.text || 'Error al conectar con el agente.';
+  return data.text || 'Sin respuesta.';
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -3366,25 +3342,26 @@ LO QUE NO HACÉS COMO ASISTENTE DEL INVERSOR:
 /* ────────────────────────────────────────────────────────────────
    Motor compartido de chat (usado por ambos asistentes)
    ─────────────────────────────────────────────────────────────── */
-async function sendToAI(systemPrompt, history) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function sendToAI(mode, history, context) {
+  const jwt = localStorage.getItem('tokai_jwt');
+  const res = await fetch((window.__API_URL__||'')+'/api/v1/ai/chat', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer '+jwt},
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1000,
-      system: systemPrompt,
-      messages: history.map(function(m){ return {role:m.role, content:m.content}; })
+      mode: mode,
+      messages: history.map(function(m){ return {role:m.role, content:String(m.content).slice(0,3000)}; }),
+      context: (context||'').slice(0,1000)
     })
   });
+  if(!res.ok) return 'Error al conectar con el asistente.';
   const data = await res.json();
-  return (data && data.content && data.content[0] && data.content[0].text) || 'Error al conectar.';
+  return data.text || 'Sin respuesta.';
 }
 
 /* ────────────────────────────────────────────────────────────────
    Componente base de chat (reutilizado por ambos asistentes)
    ─────────────────────────────────────────────────────────────── */
-function AssistantChat({systemPrompt, greeting, quickReplies, headerLabel, headerSub, mode, onClose}) {
+function AssistantChat({aiMode, projectCtx, greeting, quickReplies, headerLabel, headerSub, mode, onClose}) {
   const [msgs, setMsgs] = useState([{role:'assistant', content:greeting}]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -3398,7 +3375,7 @@ function AssistantChat({systemPrompt, greeting, quickReplies, headerLabel, heade
     setMsgs(newMsgs);
     setLoading(true);
     try {
-      const reply = await sendToAI(systemPrompt, newMsgs);
+      const reply = await sendToAI(aiMode, newMsgs, projectCtx);
       setMsgs(function(m){ return [...m, {role:'assistant', content:reply}]; });
     } catch(e) {
       setMsgs(function(m){ return [...m, {role:'assistant', content:'Error de conexión. Intentá de nuevo.'}]; });
@@ -3473,7 +3450,7 @@ function IssuerAssistant({chain, mode, onClose}) {
   const thesis = p && p.thesis || null;
   const stage = typeof getProjectStage === 'function' ? getProjectStage(p||{}) : 0;
   const stageLabels = ['','Alta','Análisis TOKAI','Tesis','Reporte','Técnico','Habilitado','Activo'];
-  const systemPrompt = buildIssuerPrompt(p, thesis);
+  const projectCtx = p ? buildProjectContext(p, thesis) : '';
 
   const greetingByStage = {
     0: '**Hola.** Todavía no tenés proyectos creados.\n\nPuedo explicarte cómo funciona el proceso de tokenización con TOKAI y qué necesitás para empezar. **¿Qué te gustaría saber?**',
@@ -3498,7 +3475,8 @@ function IssuerAssistant({chain, mode, onClose}) {
   }[stage] || ['¿Cómo funciona el proceso?','¿Qué es la tesis de valor?','¿Qué es el gate de emisión?'];
 
   return h(AssistantChat, {
-    systemPrompt,
+    aiMode: 'issuer',
+    projectCtx,
     greeting: greetingByStage,
     quickReplies: quickByStage,
     headerLabel: 'Asistente del emisor — TOKAI RWA',
@@ -3513,7 +3491,7 @@ function IssuerAssistant({chain, mode, onClose}) {
 function InvestorAssistant({project, chain, mode, onClose}) {
   const p = project || (chain && chain.projects && chain.projects[0]) || null;
   const thesis = p && p.thesis || null;
-  const systemPrompt = buildInvestorPrompt(p, thesis);
+  const projectCtx = p ? buildProjectContext(p, thesis) : '';
 
   const mechLabel = {A:'renta periódica', B:'waterfall de crédito', C:'acceso/certificado'};
   const mech = p && mechLabel[p.yieldMechanism] || 'rendimiento';
@@ -3527,7 +3505,8 @@ function InvestorAssistant({project, chain, mode, onClose}) {
     : ['¿Qué es un token RWA?','¿Cómo funciona el rendimiento?','¿Es seguro invertir?','¿Qué es el lock-up?','¿Qué regula la CNV?'];
 
   return h(AssistantChat, {
-    systemPrompt,
+    aiMode: 'investor',
+    projectCtx,
     greeting,
     quickReplies,
     headerLabel: p ? 'Asistente de inversión — '+(p.symbol||'TOKEN') : 'Asistente TOKAI RWA',
@@ -3617,21 +3596,18 @@ function buildParamsFromProject(p) {
   return { contractType: params.waterfallDistributor ? 'TOKAIToken+Waterfall' : params.soulbound ? 'TOKAIToken+Soulbound' : 'TOKAIToken', params, warnings, explanation };
 }
 
-/* ─── Llamada IA para casos complejos o validación adicional ─── */
+/* ─── Llamada IA al proxy seguro ─── */
 async function callEmissionAI(prompt, projectContext) {
-  const ctx = `PROYECTO: ${projectContext.name} | ${projectContext.vertical} | ${projectContext.regime} | supply=${projectContext.maxSupply} | price=USD${(projectContext.priceUsdCents||0)/100}`;
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const context = `PROYECTO: ${projectContext.name||''} | ${projectContext.vertical||''} | ${projectContext.regime||''} | supply=${projectContext.maxSupply||''} | price=USD${(projectContext.priceUsdCents||0)/100}`;
+  const jwt = localStorage.getItem('tokai_jwt');
+  const res = await fetch((window.__API_URL__||'')+'/api/v1/ai/chat', {
     method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1000,
-      system: buildTokaiSystemPrompt('emision', ctx),
-      messages: [{role:'user', content: prompt}]
-    })
+    headers: {'Content-Type':'application/json','Authorization':'Bearer '+jwt},
+    body: JSON.stringify({mode:'emission', messages:[{role:'user',content:prompt}], context})
   });
+  if(!res.ok) return {contractType:'TOKAIToken', params:{}, warnings:['Error al conectar con la IA'], explanation:''};
   const data = await res.json();
-  const raw = data?.content?.[0]?.text || '{}';
+  const raw = data.text || '{}';
   try { return JSON.parse(raw.replace(/```json|```/g,'').trim()); }
   catch(e) { return {contractType:'TOKAIToken', params:{}, warnings:['Error al parsear respuesta IA'], explanation: raw.slice(0,200)}; }
 }
@@ -3893,18 +3869,15 @@ El reporte debe cubrir:
 
 Formato: Markdown con encabezados claros. Usá tablas para datos financieros. Tono institucional, rioplatense. Las proyecciones van con supuestos explícitos — nunca garantizás retornos.`;
 
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const jwt = localStorage.getItem('tokai_jwt');
+      const res = await fetch((window.__API_URL__||'')+'/api/v1/ai/chat', {
         method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({
-          model:'claude-sonnet-4-6',
-          max_tokens:1000,
-          system: buildTokaiSystemPrompt('reporte', ctx),
-          messages:[{role:'user', content:prompt}]
-        })
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+jwt},
+        body: JSON.stringify({mode:'report', messages:[{role:'user',content:ctx}], context:ctx.slice(0,800)})
       });
+      if(!res.ok){ toast&&toast({type:'err',title:'Error',msg:'No se pudo conectar con la IA.'}); setGenerating(false); return; }
       const data = await res.json();
-      const report = data?.content?.[0]?.text||'Error al generar el reporte.';
+      const report = data.text||'Error al generar el reporte.';
       setReportMd(report);
       setMode('preview');
       if(chain.updateProject) chain.updateProject(pid, {businessReport: report});
