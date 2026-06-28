@@ -736,16 +736,46 @@ function useChainWeb3(account){
     try{
       const factory = await contract(dep.tokenFactory, 'TokenFactory', false);
       const n = Number(await factory.projectCount());
-      const ps = [];
+      
+      // Cargar todos los proyectos y sus datos en paralelo
+      const projectPromises = Array.from({ length: n }, async (_, i) => {
+        try {
+          const pr = await factory.projects(i);
+          const tok = await contract(pr.token, 'TOKAIToken', false);
+          
+          const [symbol, totalSupply, maxSupply, priceUsdCents, balance] = await Promise.all([
+            tok.symbol().catch(() => 'TOK'),
+            tok.totalSupply().then(Number).catch(() => 0),
+            tok.maxSupply().then(Number).catch(() => 0),
+            tok.priceUsdCents().then(Number).catch(() => 0),
+            account ? tok.balanceOf(account).then(Number).catch(() => 0) : Promise.resolve(0)
+          ]);
+
+          return {
+            id: i,
+            name: pr.name,
+            token: pr.token,
+            compliance: pr.compliance,
+            symbol,
+            totalSupply,
+            maxSupply,
+            priceUsdCents,
+            balance
+          };
+        } catch (itemErr) {
+          console.error(`Error cargando proyecto en indice ${i}:`, itemErr);
+          return null;
+        }
+      });
+
+      const ps = (await Promise.all(projectPromises)).filter(Boolean);
       const bcache = {};
-      for(let i=0;i<n;i++){
-        const pr = await factory.projects(i);
-        const tok = await contract(pr.token, 'TOKAIToken', false);
-        ps.push({ id:i, name:pr.name, token:pr.token, compliance:pr.compliance,
-          symbol: await tok.symbol(), totalSupply: Number(await tok.totalSupply()),
-          maxSupply: Number(await tok.maxSupply()), priceUsdCents: Number(await tok.priceUsdCents()) });
-        if(account){ try{ bcache[`${i}:${account}`] = Number(await tok.balanceOf(account)); }catch(_){} }
-      }
+      ps.forEach(p => {
+        if (account) {
+          bcache[`${p.id}:${account}`] = p.balance;
+        }
+      });
+
       setProjects(ps);
       setBalancesCache(bcache);
     }catch(e){ console.error('load projects',e); }
