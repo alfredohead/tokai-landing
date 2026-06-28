@@ -280,8 +280,8 @@ function mapBackendProject(p){
     emissionPaused:  p.emission_paused,
     meta:            p.meta,
     created_at:      p.created_at,
-    token:           genAddr(p.symbol),
-    compliance:      genAddr(p.symbol + 'c'),
+    token:           genAddr(p.symbol + String(p.id)),
+    compliance:      genAddr(p.symbol + 'c' + String(p.id)),
     banner:          'linear-gradient(135deg,' + (p.color || '#1a4d8f') + '33,' + (p.color || '#1a4d8f') + ')',
   };
 }
@@ -384,7 +384,7 @@ function useChain(opts){
   const [blockedJurisdictions, setBlockedJurisdictions] = useState([840]); // EE.UU. (840) por defecto
   
   /* ── Carga proyectos del backend al iniciar sesión ── */
-  useEffect(function(){
+  function syncProjects(){
     if(!opts || !opts.apiUrl || !opts.loggedIn) return;
     fetch(opts.apiUrl + '/api/v1/projects', { credentials: 'include' })
     .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
@@ -395,6 +395,21 @@ function useChain(opts){
       }
     })
     .catch(function(){}); // silencioso — mantiene INITIAL_PROJECTS como fallback
+  }
+  useEffect(function(){
+    syncProjects();
+  }, [opts && opts.loggedIn]);
+
+  /* ── Retry automático si el backend estaba caído al cargar ── */
+  useEffect(function(){
+    if(!opts || !opts.apiUrl || !opts.loggedIn) return;
+    // Si projects sigue siendo los INITIAL (id numérico), reintenta cada 30s
+    var timer = setInterval(function(){
+      var hasRealProjects = projects.some(function(p){ return typeof p.id === 'string' && p.id.length === 36; });
+      if(hasRealProjects){ clearInterval(timer); return; }
+      syncProjects();
+    }, 30000);
+    return function(){ clearInterval(timer); };
   }, [opts && opts.loggedIn]);
 
   function toggleJurisdictionBlock(jurCode){
