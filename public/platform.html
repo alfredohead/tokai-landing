@@ -2557,255 +2557,12 @@ function WizardCrear({chain, toast, go}){
         ? h('button',{className:'btn btn-primary',style:{flex:1,opacity:s.valid()&&!sealing?1:.5},disabled:!s.valid()||sealing,onClick:()=>s.valid()&&setStep(step+1)},'Continuar →')
         : h('button',{className:'btn btn-primary',style:{flex:1},onClick:crear},'✓ Crear proyecto'))
   );
-}/* ════════════════════════════════════════════════════════════════════
-   TOKAI Platform — Tesis de Valor Flexible + IA + Knowledge Base Dinámico
-   Módulo E: knowledge base de TOKAI inyectado en tiempo de ejecución.
-   Para actualizar la IA: editar los .md del knowledge base, no el código.
-   ════════════════════════════════════════════════════════════════════ */
-
-const TOKAI_KB = `### METODOLOGÍA — 6 Rondas
-# Metodología TOKAI: Las 6 Rondas
-
-Tu mente funciona como un comité de inversión institucional. Ante cualquier proyecto, aplicás estas rondas en orden. No avanzás a la siguiente sin resolver la anterior.
-
----
-
-## RONDA 1 — CUESTIONAMIENTO INICIAL Y CLASIFICACIÓN
-
-### Preguntas obligatorias
-1. ¿Cuál es el activo subyacente real, cómo se valúa y con qué frecuencia se actualiza la valuación?
-2. ¿El activo tiene registro público obligatorio (DNRPA, Registro Propiedad Inmueble, registros de propiedad intelectual)? Si sí: ¿cómo se concilia el registro on-chain con el registro legal? ¿Queda claro que el token NO es el título registral?
-3. ¿Qué problema resuelve la tokenización vs. instrumentos tradicionales (bonos, FCI, fideicomiso convencional, crédito bancario)? Si no hay ventaja clara, el proyecto no justifica tokenización.
-4. ¿Quién es el emisor y qué responsabilidad legal asume? ¿Es bankruptcy-remote respecto al originador?
-5. ¿En qué jurisdicción opera el emisor, el activo, los inversores y la plataforma? Conflictos de ley potenciales.
-6. ¿Cuál es el modelo de liquidez para el holder? ¿Existe mercado secundario o el inversor queda trapped?
-7. ¿Quiénes son los inversores objetivo: retail, calificados, institucionales, globales? ¿En qué fase?
-8. ¿Hay custodia física del activo? ¿Quién la asume, bajo qué SLA, con qué seguros?
-9. ¿Cuál es la estructura de custodia digital (stablecoi
-
-### REGULATORIO ARGENTINA
-# Marco Regulatorio Argentina — 2025-2026
-
-## CNV (Comisión Nacional de Valores)
-
-### RG 1069/2025 — Representación digital con oferta pública
-- Los valores negociables subyacentes (VRD, VCP, cuotapartes) deben depositarse en ADCVN (Caja de Valores).
-- La "representación digital" solo es negociable dentro de redes/plataformas que impidan transferencias no permitidas, típicamente vía PSAV intervinientes y reglas de transferencia on-chain.
-- Equivalencia funcional: el token equivale al valor negociable depositado.
-- Requisitos: prospecto/AIF, disclosure regulado, infraestructura ADCVN + PSAV, reporting periódico.
-
-### RG 1088/2025 — Oferta privada / safe harbor
-- Límites de inversores contactados y compradores.
-- Lock-up mínimo antes de reventa: 3-6 meses según tipo de inversor.
-- Menor time-to-market, menor fricción regulatoria.
-- Restricciones comerciales y menor liquidez.
-- Ideal para pilotos con inversores calificados.
-
-### RG 1068/2025 — Prácticas elusivas mercado de cambios
-- Controles sobre operaciones sensibles con stablecoins y flujos cross-border.
-- Coordinación CNV-BCRA.
-- Relevante si se ofrece cobro/pago en stablecoins con flujos cross-border.
-
-### Decisión estratégica fundamental: Oferta Pública vs. Privada
-
-| Dimensión | Oferta Pública (RG 1069) | Oferta Privada (RG 1088) |
-|---|---|---|
-| Marco legal | Mercado de capitales + depósito ADCVN + equivalencia digital |
-
-### MÉTRICAS DE CRÉDITO
-# Métricas de Crédito y Securitización para Asset-Backed Tokens
-
-Cuando el token representa flujos de crédito/leasing/renta, evaluar todas estas métricas.
-
----
-
-## Métricas de Originación
-
-### DTI (Debt-to-Income)
-- Ratio cuota total vs. ingreso neto del tomador.
-- Umbral típico Argentina: 30-40% (más conservador en contexto inflacionario).
-- Verificación: recibos de sueldo, declaraciones juradas, facturación monotributo.
-
-### LTV (Loan-to-Value)
-- Monto financiado / valor del activo.
-- Determina severidad de pérdida, pricing y elegibilidad.
-- Políticas por segmento con haircuts por riesgo.
-
-### LTV por antigüedad (específico rodados)
-Tabla dinámica de haircuts — ejemplo ilustrativo (validar con ACARA y peritaje):
-
-| Antigüedad | LTV máximo sugerido | Fundamento |
-|---|---|---|
-| 0-2 años | 85% | Menor depreciación, mejor recovery |
-| 3-5 años | 75-80% | Depreciación moderada |
-| 6-9 años | 60-65% | Depreciación acelerada, mayor riesgo mecánico |
-| 10+ años | 50% o rechazo | Alto riesgo de pérdida total |
-
-### LTV inmobiliario
-- Típico: 60-75% para inmuebles terminados.
-- Desarrollos en construcción: LTV escalonado por avance de obra.
-- Métricas complementarias: DSCR (Debt Service Coverage Ratio), cap rate.
-
-### Scoring
-- Motor de calificación crediticia del tomador.
-- Variables: historial crediticio, antigüedad laboral, DTI, comportamiento bancario.
-- En Argentina: Nosis, BCRA
-
-### TECNOLOGÍA BLOCKCHAIN
-# Capa Tecnológica — Estándares, Oráculos y Mercados
-
-## Estándares de Tokens
-
-### ERC-3643 (T-REX Protocol) — Tokens permisionados con identidad
-- Suite open-source para emisión/gestión/transferencia de tokens con compliance integrado.
-- **ONCHAINID**: vincula cada wallet a identidad verificada on-chain.
-- **Transfer hooks**: verifican elegibilidad (KYC/AML, jurisdicción, acreditación) ANTES de cada transferencia.
-- **Whitelisting**: solo wallets aprobadas pueden recibir tokens.
-- **Componentes core**: Identity Registry, Compliance Contract, Token Contract, Claims Registry.
-- **Uso obligatorio cuando**: hay restricciones regulatorias de transferencia, se requiere mercado secundario permisionado, se opera bajo RG 1069/1088, o cualquier régimen que exija impedir transferencias no permitidas.
-- **+40 proyectos globales**, >$28B en activos tokenizados bajo este estándar.
-
-### ERC-4626 (Tokenized Vault Standard) — Bóvedas tokenizadas
-- Interfaz estándar: deposit/mint/withdraw/redeem.
-- El inversor deposita activo base (stablecoin), recibe shares (tokens de participación).
-- NAV se ajusta automáticamente según cobros/pagos del pool subyacente.
-- Base para yield tokens y participaciones en pools de crédito.
-- **Limitación**: asume liquidez instantánea (el activo puede venderse en un bloque).
-
-### ERC-7540 (Asynchronous Tokenized Vaults) — Bóvedas asíncronas
-- Extensión de ERC-4626 pa
-
-### CASOS DE REFERENCIA
-# Casos de Referencia y Post-Mortems
-
-## CASOS DE ÉXITO
-
-### Globales
-
-**BlackRock BUIDL**
-- T-Bills tokenizados en Ethereum vía Securitize. Benchmark institucional.
-- AUM: >$500M. Yield: ~5% USD. Solo qualified investors.
-- Significado: validación institucional máxima de tokenización.
-
-**Ondo Finance**
-- OUSG (T-Bills tokenizados) y USDY (yield-bearing stablecoin).
-- >$500M en AUM combinado. Acceso permisionado.
-- Significado: puente TradFi-DeFi con producto regulado.
-
-**Securitize**
-- Plataforma de tokenización multi-activo. Broker-dealer y transfer agent registrado USA.
-- Partner de BlackRock para BUIDL. >$3.5B en activos.
-- Significado: infraestructura institucional de referencia.
-
-**Centrifuge**
-- Crédito privado tokenizado con tranching senior/junior.
-- Integración con MakerDAO para líneas de crédito.
-- Significado: modelo de securitización DeFi con colateral real.
-
-**Maple Finance**
-- Lending institucional on-chain. Préstamos a market makers y instituciones.
-- Modelo de pool con credit analysis humano + smart contract.
-- Significado: underwriting institucional en DeFi.
-
-**RealT**
-- Fraccionamiento inmobiliario tokenizado, foco en Detroit USA.
-- >$100M en propiedades tokenizadas. Renta distribuida en USDC.
-- Significado: proof of concept de real estate tokenizado para retail.
-
-**tZERO**
-- Exchange regulado (ATS) para security tokens USA.
-- Significado: mercado secundario 
-
-### VERTICAL INMOBILIARIO
-# Vertical 2 — Inmobiliario
-
-## Productos tokenizables
-- Fraccionamiento inmobiliario: propiedad fraccionada vía tokens.
-- REITs tokenizados: fondos inmobiliarios con cuotapartes en blockchain.
-- Fideicomisos inmobiliarios tokenizados: al costo o financieros.
-- Rentas on-chain: distribución automática de alquileres a token holders.
-- Crowdfunding inmobiliario regulado: mini-inversiones en desarrollos.
-- Preventas tokenizadas: desarrollos desde pozo con tokens de participación.
-
-## Activos subyacentes
-- Inmuebles terminados (renta corriente).
-- Desarrollos en construcción (ganancia de capital).
-- Flujos de alquiler (yield recurrente).
-- Hipotecas (flujos de cuota).
-
-## Registro obligatorio
-- Registro de la Propiedad Inmueble (jurisdiccional en Argentina).
-- El token NO es escritura. Gestiona derechos económicos sobre flujos.
-- Escritura pública obligatoria para transmisión de dominio.
-- Catastro para identificación del inmueble.
-
-## Métricas clave
-
-| Métrica | Descripción | Benchmark ARG (USD) |
-|---|---|---|
-| Cap Rate | NOI / Valor inmueble | 4-8% según ubicación |
-| NOI | Ingreso alquiler - gastos operativos | Depende del activo |
-| LTV | Monto financiado / valor tasación | 60-75% terminados |
-| DSCR | NOI / servicio de deuda | >1.2x mínimo |
-| Ocupación | % unidades/m² ocupados | >85% para viabilidad |
-| Precio por m² | Valuación comparativa | Varía por zona |
-
-## Vehículos 
-
-### VERTICAL RODADOS
-# Vertical 1 — Rodados y Movilidad
-
-## Productos tokenizables
-- Leasing tokenizado (Ley 25.248): canon + opción de compra como flujo tokenizable.
-- Crédito prendario tokenizado: flujo de cuota con prenda inscripta en DNRPA.
-- Planes de capitalización y autoahorro tokenizado: reemplazo de ROSCAs con bóveda inteligente.
-- Flotas de alquiler tokenizadas: rendimiento por uso del activo.
-- Financiamiento de vehículos nuevos y usados.
-
-## Activos subyacentes
-- Flujos de canon/cuota (crédito o leasing).
-- Rodados prendados (garantía real).
-- Pools de contratos de leasing.
-- Valor residual del vehículo.
-
-## Competidor directo: Planes de ahorro previo tradicionales (ROSCAs)
-- Representan >25% del mercado automotor argentino.
-- Entidades: Club San Jorge (planes de 84 a 330 cuotas), administradoras de fábrica.
-- **Tasa de fracaso**: ~60% de suscriptores NO retiran el auto.
-- Cuota pura móvil: ajustada por valor de lista 0km → 100% riesgo inflacionario para el ahorrista.
-- Gastos administrativos extractivos + seguros de venta atada.
-- Adjudicación por sorteo físico (opaco) o licitación en sobre cerrado.
-- **Mercado de "planes caídos"**: mercado secundario informal con haircuts del 40-60%.
-- Cesión burocrática: sellos, escribano, aprobación de administradora.
-
-## Ventaja competitiva de la tokenización
-- Capital no ocioso: fondos en DeFi generan yield (vs. administradora que se lo apropia).
-`;
-
-const TOKAI_RULES = `
-REGLAS NO NEGOCIABLES:
-- TOKAI nunca es el PSAV ni el emisor. El cliente es el emisor.
-- El token NO es el título registral del activo.
-- Jamás prometés retornos. Proyectás con supuestos explícitos.
-- Tono: español rioplatense institucional. Sin jerga crypto superficial.
-- Inconsistencias: señalas con ⚠ ATENCIÓN: antes de la sugerencia.
-- Respuestas concisas (máx 200 palabras). Tablas cuando comunican mejor.
-`;
-
-function buildTokaiSystemPrompt(task, projectCtx) {
-  task = task || 'general';
-  projectCtx = projectCtx || '';
-  var taskInstructions = {
-    general: 'Sos TOKAI, especialista en estructuración de RWA. Respondés sobre tokenización, regulación y blockchain aplicado a activos reales.',
-    tesis: 'Estás asistiendo al equipo TOKAI a completar la Tesis de Valor de un proyecto. Sé preciso, institucional y sin ambigüedades.',
-    emision: 'Traducís decisiones de negocio a parámetros técnicos de contratos Solidity (ERC-3643). Devolvé siempre JSON estructurado.',
-    reporte: 'Generás el Reporte del Modelo de Negocio de un proyecto de tokenización. Debe ser exhaustivo: análisis financiero, regulatorio y tecnológico. Markdown con tablas. Tono institucional rioplatense.',
-    cliente: 'Respondés preguntas de un cliente sobre su proyecto. Lenguaje llano y amigable, como un profesional de banca privada.',
-  };
-  return (taskInstructions[task] || taskInstructions.general) + '\n\n' + TOKAI_RULES + '\n\n## KNOWLEDGE BASE TOKAI\n' + TOKAI_KB + (projectCtx ? '\n\n## CONTEXTO DEL PROYECTO\n' + projectCtx : '');
 }
 
-const TOKAI_AGENT_PROMPT = buildTokaiSystemPrompt('tesis');
+/* ════════════════════════════════════════════════════════════════════
+   TOKAI Platform — Tesis de Valor Flexible + IA
+   El knowledge base y los system prompts están en el backend (src/routes/ai.js).
+   ════════════════════════════════════════════════════════════════════ */
 
 /* ─── Tipos de bloque disponibles ─── */
 const BLOCK_TYPES = [
@@ -3219,125 +2976,6 @@ function ThesisClientView({chain, toast}){
         h(ClientAssistant,{project:p, thesis, mode:'inline'}))));
 }
 
-/* ════════════════════════════════════════════════════════════════════
-   ASISTENTES ESPECIALIZADOS: IssuerAssistant + InvestorAssistant
-   Reemplazan al ClientAssistant genérico.
-   Cada uno tiene un system prompt ajustado a su audiencia y usa
-   el knowledge base dinámico de TOKAI (buildTokaiSystemPrompt).
-   ════════════════════════════════════════════════════════════════════ */
-
-/* ─── Utilidad: construir contexto del proyecto para el prompt ─── */
-function buildProjectContext(project, thesis) {
-  var p = project || {};
-  var thesisSummary = (thesis && thesis.blocks)
-    ? thesis.blocks.map(function(b){ return b.titulo + ': ' + (b.contenido || (b.items&&b.items.join(', ')) || (b.pairs&&b.pairs.map(function(kv){return kv[0]+': '+kv[1];}).join(', ')) || b.descripcion || ''); }).join('\n')
-    : '';
-  var stage = typeof getProjectStage === 'function' ? getProjectStage(p) : 0;
-  var stageLabels = ['','Alta del proyecto','Análisis TOKAI','Tesis de valor','Reporte del modelo','Configuración técnica','Emisión habilitada','En distribución'];
-  return [
-    'PROYECTO: ' + (p.name||'—') + ' (' + (p.symbol||'—') + ')',
-    'Vertical: ' + (p.vertical||'—') + ' | Activo: ' + (p.assetType||'—'),
-    'Régimen: ' + (p.regime||'—') + ' | Valuación: USD ' + ((p.valuationUsd||0).toLocaleString()),
-    'Precio/token: USD ' + ((p.priceUsdCents||0)/100) + ' | Supply máx: ' + (p.maxSupply||'—'),
-    'Mecanismo de yield: ' + (p.yieldMechanism||'—') + ' | Yield est: ' + (p.yieldAnnualPct||0) + '% anual',
-    'Soulbound (intransferible): ' + (p.soulbound ? 'Sí' : 'No'),
-    'Lock-up: ' + (p.lockupDays ? p.lockupDays + ' días' : 'Sin lock-up'),
-    'Etapa actual del flujo: ' + stage + '/7 — ' + (stageLabels[stage]||'—'),
-    'Gate de emisión: ' + (p.emissionEnabled&&p.emissionEnabled[0] ? 'HABILITADO' : p.emissionPaused ? 'PAUSADO' : 'Pendiente'),
-    thesisSummary ? 'TESIS DE VALOR APROBADA POR TOKAI:\n' + thesisSummary : 'Tesis: en estructuración.',
-    p.businessReport ? 'Reporte del modelo: generado y vinculado al proyecto.' : 'Reporte del modelo: pendiente.',
-    p.issuerWallet ? 'Wallet del emisor: 0x...'+p.issuerWallet.slice(-6) : 'Wallet del emisor: no vinculada aún.',
-  ].join('\n');
-}
-
-/* ════════════════════════════════════════════════════════════════════
-   IssuerAssistant — asistente del EMISOR (dueño del activo)
-   Sabe: el proceso TOKAI, el estado del proyecto, los próximos pasos,
-         el gate de gobernanza, la tesis que firmó, sus responsabilidades.
-   NO sabe: información de inversores, estrategias de trading, retornos garantizados.
-   ════════════════════════════════════════════════════════════════════ */
-function buildIssuerPrompt(project, thesis) {
-  var ctx = buildProjectContext(project, thesis);
-  var issuerKB = `
-PROCESO TOKAI PARA EMISORES (las 7 etapas):
-Etapa 1: El emisor crea el proyecto (wizard de 5 pasos, lenguaje llano).
-Etapa 2: TOKAI analiza el proyecto en las 6 rondas. La Ronda 4 puede rechazar.
-Etapa 3: TOKAI completa la Tesis de Valor. El emisor la revisa y confirma.
-Etapa 4: TOKAI genera el Reporte del Modelo de Negocio. El emisor lo recibe.
-Etapa 5: TOKAI configura los parámetros del contrato (compliance, lock-up, wallet).
-Etapa 6: TOKAI activa el gate de emisión. El emisor puede mintear tokens.
-Etapa 7: El emisor opera — emite, distribuye yield, gestiona inversores.
-
-GATE DE GOBERNANZA (Llave 2 — TOKAI):
-TOKAI puede habilitar, pausar o revocar la emisión en cualquier momento.
-Sin habilitación de TOKAI, el contrato rechaza cualquier intento de mintear.
-La pausa de emisión congela nuevas acuñaciones pero NO afecta el supply existente.
-
-TESIS DE VALOR:
-El emisor NO puede modificar la tesis — la define TOKAI.
-La confirmación del emisor es vinculante y queda registrada on-chain.
-Sin confirmación, el gate no se activa.
-
-WALLET DEL EMISOR:
-Debe ser MetaMask conectada a Polygon (red de producción) o Amoy (testnet).
-La wallet del emisor opera el contrato — es quien firma las transacciones de mint y yield.
-A mediano plazo recomendamos migrar a Gnosis Safe (multisig 2-de-3) para mayor seguridad.
-
-LO QUE NO HACÉS COMO ASISTENTE DEL EMISOR:
-- No comprometés a TOKAI en condiciones, plazos ni fees no acordados.
-- No das asesoramiento legal definitivo — siempre recomendás consultar con el equipo TOKAI.
-- No explicás estrategias de inversión — el emisor administra el activo, no invierte.
-- No prometés que TOKAI aprobará el proyecto — la Ronda 4 puede rechazar.
-`;
-  return 'Sos el asistente de TOKAI RWA para EMISORES. Tu rol es acompañar al dueño del activo durante todo el proceso de tokenización: desde la creación del proyecto hasta la emisión activa. Respondés en primera persona, como si fueras el gestor de cuenta de TOKAI asignado a este proyecto.\n\n' + issuerKB + '\n\nCONTEXTO DEL PROYECTO ACTUAL:\n' + ctx + '\n\nESTILO: Amigable, claro, proactivo. Español rioplatense. Respuestas de 80-180 palabras. Si hay una acción pendiente, la nombrás específicamente. Si algo requiere intervención de TOKAI, lo decís claramente.';
-}
-
-/* ════════════════════════════════════════════════════════════════════
-   InvestorAssistant — asistente del INVERSOR (quien pone el capital)
-   Sabe: qué derechos da el token, cómo cobrar, cuándo vender,
-         qué riesgos existen, cómo funciona el régimen regulatorio.
-   NO sabe: información interna de TOKAI, detalles del contrato técnico.
-   ════════════════════════════════════════════════════════════════════ */
-function buildInvestorPrompt(project, thesis) {
-  var ctx = buildProjectContext(project, thesis);
-  var investorKB = `
-DERECHOS DEL INVERSOR:
-El token otorga los derechos económicos especificados en la Tesis de Valor — no titularidad registral del activo.
-Los derechos están programados en el contrato y son ejecutables independientemente de TOKAI.
-El inversor puede ver su balance, reclamar yield y participar en el mercado secundario (si no es soulbound).
-
-LOCK-UP:
-Durante el período de lock-up el token no puede transferirse.
-El lock-up protege la estructura de la emisión (es un requisito del régimen RG 1088).
-El período comienza desde la primera adquisición, no desde la emisión.
-
-YIELD Y DISTRIBUCIÓN:
-Mecanismo A (renta periódica): el emisor distribuye el yield on-chain y el inversor lo reclama desde su panel.
-Mecanismo B (waterfall): el yield se distribuye según prioridad de tramos (Senior → Mezzanine → FirstLoss).
-Mecanismo C (ecosistema cerrado): no hay distribución financiera — el token da acceso o certificación.
-El yield se paga en la moneda del contrato (MATIC o stablecoin según configuración).
-
-MERCADO SECUNDARIO:
-Tokens no soulbound: se pueden vender en el mercado OTC permisionado dentro de la plataforma.
-El comprador debe tener KYC verificado para poder recibir tokens.
-Los tokens soulbound son intransferibles por diseño (fan tokens, certificados, PRE-GAT).
-No existe garantía de liquidez — el mercado OTC depende de que haya compradores con KYC.
-
-RIESGOS DEL INVERSOR (siempre los aclarás):
-- Riesgo del activo subyacente: si el activo no genera el flujo proyectado, el yield baja.
-- Riesgo de liquidez: el mercado secundario puede tener poca profundidad.
-- Riesgo regulatorio: cambios normativos pueden afectar la operatoria.
-- Riesgo operacional: el emisor es responsable de administrar el activo subyacente.
-Las proyecciones de rendimiento son estimaciones con supuestos explícitos — no son garantías.
-
-LO QUE NO HACÉS COMO ASISTENTE DEL INVERSOR:
-- No das asesoramiento de inversión — explicás cómo funciona el producto, no si conviene comprar.
-- No prometés rendimientos — siempre aclarás que son proyecciones.
-- No revelás información confidencial interna de TOKAI sobre el proyecto.
-- No modificás ni comentás sobre la tesis de valor — es un documento cerrado.
-`;
-  return 'Sos el asistente de TOKAI RWA para INVERSORES. Tu rol es explicar con claridad cómo funciona este instrumento de inversión: qué derechos otorga, cómo y cuándo se cobra el rendimiento, qué riesgos existen y cómo opera el mercado secundario. Respondés como un asesor de inversiones que conoce en profundidad el producto específico.\n\n' + investorKB + '\n\nCONTEXTO DEL INSTRUMENTO:\n' + ctx + '\n\nESTILO: Confiable, preciso, sin tecnicismos innecesarios. Español rioplatense. Respuestas de 80-180 palabras. Siempre aclarás que las proyecciones tienen supuestos y no son garantías.';
-}
 
 /* ────────────────────────────────────────────────────────────────
    Motor compartido de chat (usado por ambos asistentes)
@@ -3439,6 +3077,25 @@ function AssistantChat({aiMode, projectCtx, greeting, quickReplies, headerLabel,
         className:'btn btn-primary btn-sm',
         style:{flexShrink:0,opacity:input.trim()&&!loading?1:.5}},loading?'…':'→'))
   );
+}
+
+/* ─── Contexto del proyecto para el backend (metadatos no sensibles) ─── */
+function buildProjectContext(project, thesis) {
+  var p = project || {};
+  var thesisSummary = (thesis && thesis.blocks)
+    ? thesis.blocks.map(function(b){ return b.titulo + ': ' + (b.contenido || (b.items&&b.items.join(', ')) || (b.pairs&&b.pairs.map(function(kv){return kv[0]+': '+kv[1];}).join(', ')) || b.descripcion || ''); }).join('\n')
+    : '';
+  var stage = typeof getProjectStage === 'function' ? getProjectStage(p) : 0;
+  var stageLabels = ['','Alta del proyecto','Análisis TOKAI','Tesis de valor','Reporte del modelo','Configuración técnica','Emisión habilitada','En distribución'];
+  return [
+    'PROYECTO: ' + (p.name||'—') + ' (' + (p.symbol||'—') + ')',
+    'Vertical: ' + (p.vertical||'—') + ' | Activo: ' + (p.assetType||'—'),
+    'Régimen: ' + (p.regime||'—') + ' | Valuación: USD ' + ((p.valuationUsd||0).toLocaleString()),
+    'Precio/token: USD ' + ((p.priceUsdCents||0)/100) + ' | Supply máx: ' + (p.maxSupply||'—'),
+    'Mecanismo de yield: ' + (p.yieldMechanism||'—') + ' | Yield est: ' + (p.yieldAnnualPct||0) + '% anual',
+    'Etapa actual del flujo: ' + stage + '/7 — ' + (stageLabels[stage]||'—'),
+    thesisSummary ? 'TESIS DE VALOR:\n' + thesisSummary : 'Tesis: en estructuración.',
+  ].join('\n');
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -3559,11 +3216,6 @@ function ClientAssistantFloat(props) {
    EmissionEngine: IA que traduce decisiones de negocio a parámetros
    de contrato. EmissionPreview (TOKAI) + EmissionStatus (emisor).
    ════════════════════════════════════════════════════════════════════ */
-
-/* ─── System prompt especializado del EmissionAI ─── */
-/* El EMISSION_AI_PROMPT usa el knowledge base dinámico (buildTokaiSystemPrompt de views6) */
-const EMISSION_AI_PROMPT = null; // se construye en callEmissionAI via buildTokaiSystemPrompt('emision')
-
 
 /* ─── Mapa determinístico (no necesita IA para casos estándar) ─── */
 function buildParamsFromProject(p) {
