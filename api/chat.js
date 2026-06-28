@@ -1,16 +1,20 @@
 const rateLimit = new Map();
 const RATE_LIMIT = 10;
 const RATE_WINDOW = 60 * 1000;
+const ALLOWED_ORIGIN = 'https://tokairwa.vercel.app';
 
 export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // CORS restringido al dominio propio
+  const origin = req.headers.origin || '';
+  if (origin === ALLOWED_ORIGIN || process.env.NODE_ENV !== 'production') {
+    res.setHeader('Access-Control-Allow-Origin', origin || ALLOWED_ORIGIN);
+  }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método no permitido' });
 
-  // Rate limiting
+  // Rate limiting por IP
   const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || 'unknown';
   const now = Date.now();
   const entry = rateLimit.get(ip) || { count: 0, start: now };
@@ -26,8 +30,6 @@ export default async function handler(req, res) {
   if (!Array.isArray(messages) || messages.length === 0 || messages.length > 20) {
     return res.status(400).json({ error: 'Formato inválido' });
   }
-
-  // Validate message content
   for (const msg of messages) {
     if (!msg.role || !msg.content || typeof msg.content !== 'string' || msg.content.length > 2000) {
       return res.status(400).json({ error: 'Mensaje inválido' });
@@ -44,7 +46,6 @@ IMPORTANTE:
 - Si alguien quiere armar un proyecto o necesita estructuración, indicale que contacte al laboratorio TOKAI RWA directamente en tokairwa@gmail.com.
 - Respondés en español rioplatense, tono profesional pero accesible.
 - Respuestas claras y concisas: 2-3 párrafos para preguntas simples.
-- Podés explicar conceptos como: tokenización, security tokens, utility tokens, ERC-3643, ERC-4626, MiCA, Howey Test, CNV, fideicomiso financiero, waterfall, LTV, etc.
 - Mencionás marcos regulatorios cuando es relevante: Argentina (CNV RG 1069/1088, PSAV, UIF), USA (SEC, Reg D/A+/CF/S), UE (MiCA, MiFID II), LATAM.
 - Siempre aclarás que la información es educativa y que para un proyecto real deben consultar con profesionales y con TOKAI RWA.
 
