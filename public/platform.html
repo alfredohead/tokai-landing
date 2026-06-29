@@ -3126,7 +3126,7 @@ function ThesisBadge({estado}){
 /* ─── Llamada al proxy de IA (backend protegido) ─── */
 async function callTokaiAgent(userMsg, projectContext){
   const context = `PROYECTO: ${projectContext.name||''} | Vertical: ${projectContext.vertical||''} | Régimen: ${projectContext.regime||''} | Mecanismo: ${projectContext.yieldMechanism||''} | Valuación: USD ${(projectContext.valuationUsd||0).toLocaleString()} | Desc: ${(projectContext.desc||'').slice(0,200)}`;
-  const res = await fetch((window.__API_URL__||'')+'/api/v1/ai/chat',{
+  const res = await fetch((window.__API_URL__||'')+'/ai/chat',{
     method:'POST',
     credentials:'include',
     headers:{'Content-Type':'application/json'},
@@ -3529,7 +3529,7 @@ function ThesisClientView({chain, toast}){
    Motor compartido de chat (usado por ambos asistentes)
    ─────────────────────────────────────────────────────────────── */
 async function sendToAI(mode, history, context) {
-  const res = await fetch((window.__API_URL__||'')+'/api/v1/ai/chat', {
+  const res = await fetch((window.__API_URL__||'')+'/ai/chat', {
     method: 'POST',
     credentials: 'include',
     headers: {'Content-Type': 'application/json'},
@@ -3799,7 +3799,7 @@ function buildParamsFromProject(p) {
 /* ─── Llamada IA al proxy seguro ─── */
 async function callEmissionAI(prompt, projectContext) {
   const context = `PROYECTO: ${projectContext.name||''} | ${projectContext.vertical||''} | ${projectContext.regime||''} | supply=${projectContext.maxSupply||''} | price=USD${(projectContext.priceUsdCents||0)/100}`;
-  const res = await fetch((window.__API_URL__||'')+'/api/v1/ai/chat', {
+  const res = await fetch((window.__API_URL__||'')+'/ai/chat', {
     method: 'POST',
     credentials: 'include',
     headers: {'Content-Type':'application/json'},
@@ -4069,7 +4069,7 @@ El reporte debe cubrir:
 
 Formato: Markdown con encabezados claros. Usá tablas para datos financieros. Tono institucional, rioplatense. Las proyecciones van con supuestos explícitos — nunca garantizás retornos.`;
 
-      const res = await fetch((window.__API_URL__||'')+'/api/v1/ai/chat', {
+      const res = await fetch((window.__API_URL__||'')+'/ai/chat', {
         method:'POST',
         credentials:'include',
         headers:{'Content-Type':'application/json'},
