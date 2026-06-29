@@ -1335,7 +1335,7 @@ function AdminProjects({chain,toast}){
         )),
       h('button',{className:'btn btn-primary',style:{marginTop:16},onClick:create},'Desplegar proyecto')
     ),
-    h('div',{className:'card',style:{padding:0,overflow:'hidden'}},
+    h('div',{className:'card',style:{padding:0,overflowX:'auto'}},
       h('table',{},h('thead',{},h('tr',{},['Proyecto','Símbolo','Supply','Régimen','Reglas','Token'].map(x=>h('th',{key:x},x)))),
         h('tbody',{},chain.projects.map(p=>h('tr',{key:p.id},
           h('td',{},h('b',{},p.name),h('div',{style:{fontSize:11,color:'var(--txt-mute)'}},p.vertical)),
@@ -1412,7 +1412,7 @@ function AdminYield({chain,toast}){
 }
 
 function AdminKyc({chain,toast}){
-  return h('div',{className:'card',style:{padding:0,overflow:'hidden'}},
+  return h('div',{className:'card',style:{padding:0,overflowX:'auto'}},
     h('table',{},h('thead',{},h('tr',{},['Wallet','Jurisdicción','Categoría','Estado','Acción'].map(x=>h('th',{key:x},x)))),
       h('tbody',{},DEMO_WALLETS.filter(w=>w.role!=='admin').map(w=>{const id=chain.identities[w.addr];
         return h('tr',{key:w.addr},
@@ -1484,7 +1484,7 @@ function MarketView({chain,wallet,toast,initialPid}){
       ),
       /* Panel derecho: order book + historial */
       h('div',{style:{flex:'1 1 62%',display:'flex',flexDirection:'column',gap:16}},
-        h('div',{className:'card',style:{padding:0,overflow:'hidden'}},
+        h('div',{className:'card',style:{padding:0,overflowX:'auto'}},
           h('div',{style:{padding:'16px 20px',borderBottom:'1px solid var(--line-solid)',display:'flex',alignItems:'center',gap:10}},
             h('h3',{style:{fontSize:14,fontWeight:700,margin:0}},'Órdenes abiertas · '+p.symbol),
             openOrders.length>0&&h('span',{style:{fontSize:10,color:'var(--txt-mute)',padding:'2px 8px',borderRadius:10,background:'rgba(255,255,255,.04)'}},openOrders.length+' activas')),
@@ -1521,7 +1521,7 @@ function MarketView({chain,wallet,toast,initialPid}){
               })))
         ),
         /* Historial de transacciones ejecutadas */
-        historial.length>0&&h('div',{className:'card',style:{padding:0,overflow:'hidden'}},
+        historial.length>0&&h('div',{className:'card',style:{padding:0,overflowX:'auto'}},
           h('div',{style:{padding:'12px 20px',borderBottom:'1px solid var(--line-solid)',display:'flex',alignItems:'center',gap:8}},
             h('h3',{style:{fontSize:13,fontWeight:700,margin:0}},'Historial de transacciones · '+p.symbol),
             h('span',{style:{fontSize:10,color:'var(--txt-mute)',padding:'2px 7px',borderRadius:10,background:'rgba(255,255,255,.04)'}},historial.length+' trades')),
@@ -1804,7 +1804,7 @@ function AssetDetail({chain,wallet,pid,toast,go}){
           // estructura de tramos (waterfall) — rigor TOKAI que Reental no muestra
           p.tranches&&p.tranches.length>0&&h('div',{style:{marginTop:16}},
             h('div',{className:'gate-title',style:{marginBottom:10}},h(Icon,{d:I.admin,style:{width:14,height:14}}),'Estructura de capital (waterfall)'),
-            h('div',{className:'card',style:{padding:0,overflow:'hidden',background:'var(--black)'}},
+            h('div',{className:'card',style:{padding:0,overflowX:'auto',background:'var(--black)'}},
               h('table',{},h('thead',{},h('tr',{},['Tramo','Participación','Rendimiento','Riesgo'].map(x=>h('th',{key:x},x)))),
                 h('tbody',{},p.tranches.map((t,i)=>h('tr',{key:i},
                   h('td',{},t.name),h('td',{className:'mono'},t.pct+'%'),h('td',{className:'mono'},t.rate),
@@ -1992,7 +1992,7 @@ function PortfolioView({chain,wallet,toast,go}){
       // posiciones
       positions.length===0?h('div',{className:'card empty'},h(Icon,{d:I.proj}),h('div',{},'Todavía no tenés posiciones'),
         h('button',{className:'btn btn-primary btn-sm',style:{marginTop:14},onClick:()=>go('dash')},'Explorar proyectos')):
-      h('div',{className:'card',style:{padding:0,overflow:'hidden'}},
+      h('div',{className:'card',style:{padding:0,overflowX:'auto'}},
         h('table',{},h('thead',{},h('tr',{},['Proyecto','Tokens','Valor','Renta est.','Yield reclamable','Acción'].map(x=>h('th',{key:x},x)))),
           h('tbody',{},positions.map(({p,bal,claimable})=>h('tr',{key:p.id},
             h('td',{},h('b',{},p.symbol),h('div',{style:{fontSize:11,color:'var(--txt-mute)'}},p.vertical),
@@ -2039,7 +2039,7 @@ function PortfolioView({chain,wallet,toast,go}){
       /* ── Transacciones de canje en proceso ── */
       pendingRedemptions.length>0&&h('div',{style:{marginTop:20}},
         h('div',{className:'eyebrow',style:{marginBottom:8,color:'var(--amber)'}},'Canjes en proceso'),
-        h('div',{className:'card',style:{padding:0,overflow:'hidden'}},
+        h('div',{className:'card',style:{padding:0,overflowX:'auto'}},
           h('div',{style:{padding:'12px 20px',borderBottom:'1px solid var(--line-solid)',fontWeight:700,fontSize:13,color:'var(--amber)'}},'⏳ Solicitudes de canje en emisión off-chain (3–5 días hábiles)'),
           h('table',{},
             h('thead',{},h('tr',{},['Proyecto','Token ID','Tx Hash','Fecha','Estado'].map(function(x){ return h('th',{key:x},x); }))),
@@ -2162,7 +2162,7 @@ function TokaiView({chain,toast,subView,go}){
             enRonda.length===0&&h('div',{style:{fontSize:10,color:'var(--txt-mute)',textAlign:'center',paddingTop:14}},'—'));
         })),
       h('h2',{style:{fontSize:17,fontWeight:700,marginBottom:14}},'Supervisión de compliance'),
-      h('div',{className:'card',style:{padding:0,overflow:'hidden'}},
+      h('div',{className:'card',style:{padding:0,overflowX:'auto'}},
         h('table',{},
           h('thead',{},h('tr',{},['Emisor','Régimen','Modo KYC','PSAV activo','Geo','Supply','BFA'].map(x=>h('th',{key:x},x)))),
           h('tbody',{},chain.projects.map(p=>{
@@ -3579,7 +3579,7 @@ function AssistantChat({aiMode, projectCtx, greeting, quickReplies, headerLabel,
 
   const isFloat = mode==='float';
   const containerStyle = isFloat
-    ? {position:'fixed',bottom:80,right:20,width:370,height:540,background:'var(--panel)',borderRadius:16,border:'1px solid var(--line-solid)',boxShadow:'0 8px 40px rgba(0,0,0,.5)',zIndex:300,display:'flex',flexDirection:'column',overflow:'hidden'}
+    ? {position:'fixed',bottom:80,right:20,width:'calc(100% - 40px)',maxWidth:370,height:'min(540px, calc(100vh - 120px))',background:'var(--panel)',borderRadius:16,border:'1px solid var(--line-solid)',boxShadow:'0 8px 40px rgba(0,0,0,.5)',zIndex:300,display:'flex',flexDirection:'column',overflow:'hidden'}
     : {display:'flex',flexDirection:'column',height:460,background:'var(--black)',borderRadius:12,border:'1px solid var(--line-solid)',marginTop:16};
 
   return h('div',{style:containerStyle},
@@ -4704,7 +4704,7 @@ function AdminKycDual({ chain, toast }) {
 
   function renderTabContent() {
     if (tab === 'list') {
-      return h('div', { className: 'card', style: { padding: 0, overflow: 'hidden' } },
+      return h('div', { className: 'card', style: { padding: 0, overflowX: 'auto' } },
         verifiedHolders.length === 0
           ? h('div', { style: { padding: '32px', textAlign: 'center', color: 'var(--txt-mute)', fontSize: 13 } }, 'Ningun holder verificado todavia.')
           : h('table', { style: { width: '100%', borderCollapse: 'collapse', fontSize: 12.5 } },
@@ -5506,7 +5506,7 @@ function AdminAccesos({ chain, toast }) {
         h('div', { style: { fontSize: 28, marginBottom: 12 } }, tab === 'pending' ? '📬' : '✅'),
         h('div', { style: { fontSize: 14 } }, tab === 'pending' ? 'No hay solicitudes pendientes.' : 'No hay emisores habilitados todavía.'));
 
-      return h('div', { className: 'card', style: { padding: 0, overflow: 'hidden' } },
+      return h('div', { className: 'card', style: { padding: 0, overflowX: 'auto' } },
         h('table', { style: { width: '100%', borderCollapse: 'collapse' } },
           h('thead', {},
             h('tr', {}, ['Contacto', 'Proyecto', 'Régimen', 'Valoración', 'Fecha', 'Cómo llegó', tab === 'pending' ? 'Acción' : 'Estado'].map(function(col) {
@@ -5621,7 +5621,7 @@ function AdminWhitelist({ chain, toast }) {
         'Gas estimado: ',h('strong',{},gasEst.gasPOL+' POL'),' ≈ USD ',h('strong',{},gasEst.gasUSD),
         h('span',{style:{color:'var(--txt-mute)',marginLeft:8}},'(precio POL demo ≈ $0.40)'))),
 
-    h('div',{className:'card',style:{padding:0,overflow:'hidden'}},
+    h('div',{className:'card',style:{padding:0,overflowX:'auto'}},
       h('table',{style:{width:'100%',borderCollapse:'collapse'}},
         h('thead',{},h('tr',{},[' Wallet','Email','Estado','Acción'].map(function(c){
           return h('th',{key:c,style:{padding:'8px 12px',textAlign:'left',fontSize:11,color:'var(--txt-mute)',textTransform:'uppercase',letterSpacing:'.05em',borderBottom:'1px solid var(--line-solid)',background:'rgba(255,255,255,.02)'}},c);
