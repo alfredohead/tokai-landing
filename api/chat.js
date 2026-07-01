@@ -1,13 +1,19 @@
 const rateLimit = new Map();
 const RATE_LIMIT = 10;
 const RATE_WINDOW = 60 * 1000;
-const ALLOWED_ORIGIN = 'https://tokairwa.vercel.app';
+const ALLOWED_ORIGINS = [
+      'https://tokairwa.vercel.app',
+      'https://tokairwa.com',
+      'https://www.tokairwa.com',
+      'https://tokairwa.online',
+      'https://www.tokairwa.online'
+  ];
 
 export default async function handler(req, res) {
   // CORS restringido al dominio propio
   const origin = req.headers.origin || '';
-  if (origin === ALLOWED_ORIGIN || process.env.NODE_ENV !== 'production') {
-    res.setHeader('Access-Control-Allow-Origin', origin || ALLOWED_ORIGIN);
+  if (ALLOWED_ORIGINS.includes(origin) || process.env.NODE_ENV !== 'production') {
+    res.setHeader('Access-Control-Allow-Origin', origin || ALLOWED_ORIGINS[0]);
   }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
