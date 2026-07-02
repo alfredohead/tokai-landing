@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">TOKAI RWA - Tokenizacion de activos reales</title>
+  <desc id="desc">Preview social de TOKAI RWA, laboratorio de estructuracion, tokenizacion y compliance para activos reales.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#050706"/>
+      <stop offset="0.55" stop-color="#0A0A0A"/>
+      <stop offset="1" stop-color="#0B1F16"/>
+    </linearGradient>
+    <linearGradient id="emerald" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00D67E"/>
+      <stop offset="1" stop-color="#007A4D"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="16" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <path d="M0 495 C240 420 385 575 630 475 C865 378 1030 435 1200 355 L1200 630 L0 630 Z" fill="#07130E"/>
+  <g opacity="0.16" stroke="#00D67E" stroke-width="1">
+    <path d="M80 94 H1120"/>
+    <path d="M80 194 H1120"/>
+    <path d="M80 294 H1120"/>
+    <path d="M80 394 H1120"/>
+    <path d="M80 494 H1120"/>
+    <path d="M180 70 V560"/>
+    <path d="M380 70 V560"/>
+    <path d="M580 70 V560"/>
+    <path d="M780 70 V560"/>
+    <path d="M980 70 V560"/>
+  </g>
+  <circle cx="945" cy="170" r="132" fill="#00D67E" opacity="0.08"/>
+  <g transform="translate(95 104)" filter="url(#glow)">
+    <rect x="0" y="0" width="32" height="32" rx="5" fill="url(#emerald)"/>
+    <rect x="42" y="0" width="32" height="32" rx="5" fill="url(#emerald)" opacity="0.75"/>
+    <rect x="84" y="0" width="32" height="32" rx="5" fill="url(#emerald)"/>
+    <rect x="21" y="42" width="32" height="32" rx="5" fill="url(#emerald)" opacity="0.55"/>
+    <rect x="63" y="42" width="32" height="32" rx="5" fill="url(#emerald)"/>
+    <rect x="42" y="84" width="32" height="32" rx="5" fill="url(#emerald)"/>
+  </g>
+  <text x="95" y="274" fill="#FFFFFF" font-family="Outfit, Inter, Arial, sans-serif" font-size="92" font-weight="900" letter-spacing="10">TOKAI</text>
+  <text x="498" y="274" fill="#00D67E" font-family="Outfit, Inter, Arial, sans-serif" font-size="58" font-weight="800" letter-spacing="8">RWA</text>
+  <rect x="98" y="308" width="136" height="5" rx="3" fill="url(#emerald)"/>
+  <text x="95" y="378" fill="#D9E5DE" font-family="Outfit, Inter, Arial, sans-serif" font-size="34" font-weight="600">Tokenizacion de activos reales</text>
+  <text x="95" y="432" fill="#8A938C" font-family="JetBrains Mono, Consolas, monospace" font-size="23" letter-spacing="2">STRUCTURING - TOKENIZATION - COMPLIANCE</text>
+  <text x="95" y="502" fill="#B8C2BC" font-family="Outfit, Inter, Arial, sans-serif" font-size="25">Laboratorio para proyectos RWA con rigor financiero, legal y on-chain.</text>
+</svg>
