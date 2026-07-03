@@ -664,7 +664,9 @@ function useWeb3(){
     setConnecting(true); setError(null);
     try{
       const accs = await window.ethereum.request({ method:'eth_requestAccounts' });
-      setAccount(accs[0]);
+      const activeAccount = accs && accs[0];
+      if(!activeAccount) throw new Error('MetaMask no devolvio una cuenta activa.');
+      setAccount(activeAccount);
       // verificar red
       const cid = await window.ethereum.request({ method:'eth_chainId' });
       if(cid !== getActiveNetwork().chainIdHex){
@@ -677,7 +679,7 @@ function useWeb3(){
         }
       }
       setChainOk(true);
-      return true;
+      return activeAccount;
     }catch(e){ setError(e.message || 'Error de conexión'); return false; }
     finally{ setConnecting(false); }
   }
@@ -2478,15 +2480,24 @@ function LoginGate({onLogin, web3, toast}){
   async function loginWallet(){
     if(web3&&web3.available){
       setPhase('signing');
-      const ok = await web3.connect();
-      if(ok){
+      setError('');
+      const result = await Promise.race([
+        web3.connect(),
+        new Promise(resolve=>setTimeout(()=>resolve('__TOKAI_WALLET_TIMEOUT__'),45000))
+      ]);
+      if(result==='__TOKAI_WALLET_TIMEOUT__'){
         setPhase('input');
-        onLogin({method:'wallet', id:web3.account, label:short(web3.account), role:'investor', approved:true});
+        toast&&toast({type:'warn',title:'MetaMask no respondio',msg:'Abrí MetaMask y confirmá la conexión, o intentá nuevamente.'});
+        return;
+      }
+      if(result){
+        const connectedAccount = typeof result==='string' ? result : web3.account;
+        setPhase('input');
+        onLogin({method:'wallet', id:connectedAccount, label:short(connectedAccount), role:'investor', approved:true});
         return;
       }
       setPhase('input');
-      if(web3.error) toast&&toast({type:'err',title:'Error',msg:web3.error});
-      else setPhase('input');
+      toast&&toast({type:'err',title:'No se pudo conectar',msg:web3.error || 'MetaMask rechazó o no completó la conexión.'});
     } else {
       onLogin({method:'wallet', id:'0xDEMO', label:'Wallet demo', role:'investor', approved:true});
     }
@@ -2565,8 +2576,9 @@ function LoginGate({onLogin, web3, toast}){
         /* ── FASE: esperando firma wallet ── */
         phase==='signing'&&h('div',{style:{textAlign:'center',padding:'24px 0'}},
           h('div',{style:{fontSize:32,marginBottom:12}},'🦊'),
-          h('div',{style:{fontSize:14,fontWeight:600,marginBottom:8}},'Esperando firma en MetaMask'),
-          h('div',{style:{fontSize:12,color:'var(--txt-mute)',lineHeight:1.5}},'Revisá la ventana emergente de MetaMask y firmá el mensaje de acceso.'))),
+          h('div',{style:{fontSize:14,fontWeight:600,marginBottom:8}},'Esperando MetaMask'),
+          h('div',{style:{fontSize:12,color:'var(--txt-mute)',lineHeight:1.5,marginBottom:14}},'Revisa la ventana emergente de MetaMask y confirma la conexion.'),
+          h('button',{className:'btn btn-ghost btn-sm',onClick:resetToInput},'Cancelar'))),
 
       /* Footer */
       h('p',{style:{fontSize:10,color:'var(--txt-mute)',marginTop:16,textAlign:'center',lineHeight:1.5}},
