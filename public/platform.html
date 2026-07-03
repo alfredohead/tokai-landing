@@ -1,5 +1,5 @@
 <!doctype html><html lang="es"><head><script>(function(){
-  var allowed = ["localhost","127.0.0.1","tokairwa.vercel.app","tokairwa.online","www.tokairwa.online","platform.tokai.com.ar","tokai.com.ar","www.tokai.com.ar","tokairwa.com","www.tokairwa.com"];
+  var allowed = ["localhost","127.0.0.1","tokairwa.com","www.tokairwa.com","tokairwa.vercel.app","platform.tokai.com.ar","tokai.com.ar","www.tokai.com.ar"];
   var h = window.location.hostname;
   var isAllowed = allowed.indexOf(h) !== -1 || h.endsWith('.vercel.app');
   if (!isAllowed) {
@@ -13,27 +13,57 @@
 window.__ABIS__ = window.__ABIS__ || null;
 window.__DEPLOYMENT__ = window.__DEPLOYMENT__ || null;
 
+/* PRE-GAT — Configuración del instrumento live en Polygon PoS mainnet.
+   Contrato GATCertificate.sol desplegado el 2026-06-26.
+   Admin/operator: 0x110a0c7F2510075e4fD101BFa36B1837290F3976
+   2 certificados emitidos (INV-001). */
+window.__PREGAT__ = window.__PREGAT__ || {
+  address:  '0xf9e16618297e51C6908746C86B115C5497672A53',
+  chainId:  137,
+  network:  'polygon',
+  rpc:      'https://polygon-rpc.com',
+  rpcFallback: 'https://polygon.publicnode.com',
+  explorer: 'https://polygonscan.com',
+  admin:    '0x110a0c7F2510075e4fD101BFa36B1837290F3976',
+  snapshot: {
+    totalMinted: 2,
+    totalRedeemed: 0,
+    totalInvestors: 1,
+    remainingSupply: 498,
+    remainingInvestorSlots: 49,
+    phase2Active: false,
+    capitalRaisedUSD: 6000
+  },
+};
+
 /* ABI de GATCertificate (ERC-721 Soulbound) — inyectado en modo live.
-   Refleja GATCertificate.sol: addQualifiedInvestor, mint, batchMint, redeem, activatePhase2.
+   Refleja GATCertificate.sol desplegado en Polygon PoS mainnet (chainId 137).
    Reemplazar __ABIS__ con el objeto completo de app/abis.json post-deploy. */
 if (!window.__ABIS__) {
   window.__ABIS__ = {
-    /* ERC-721 Soulbound — GATCertificate (certificado PRE-GAT, canje Fase 2) */
+    /* ERC-721 Soulbound — GATCertificate · PRE-GAT · Polygon PoS mainnet */
     GATCertificate: [
+      {"type":"function","name":"instrumentStatus","inputs":[],"outputs":[{"name":"_totalMinted","type":"uint256"},{"name":"_totalRedeemed","type":"uint256"},{"name":"_totalInvestors","type":"uint256"},{"name":"_remainingSupply","type":"uint256"},{"name":"_remainingInvestorSlots","type":"uint256"},{"name":"_phase2Active","type":"bool"},{"name":"_capitalRaisedUSD","type":"uint256"}],"stateMutability":"view"},
       {"type":"function","name":"addQualifiedInvestor","inputs":[{"name":"investor","type":"address"}],"outputs":[],"stateMutability":"nonpayable"},
-      {"type":"function","name":"mint","inputs":[{"name":"to","type":"address"}],"outputs":[{"name":"tokenId","type":"uint256"}],"stateMutability":"nonpayable"},
+      {"type":"function","name":"removeQualifiedInvestor","inputs":[{"name":"investor","type":"address"}],"outputs":[],"stateMutability":"nonpayable"},
+      {"type":"function","name":"mint","inputs":[{"name":"to","type":"address"}],"outputs":[],"stateMutability":"nonpayable"},
       {"type":"function","name":"batchMint","inputs":[{"name":"to","type":"address"},{"name":"quantity","type":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
       {"type":"function","name":"redeem","inputs":[{"name":"tokenId","type":"uint256"}],"outputs":[],"stateMutability":"nonpayable"},
       {"type":"function","name":"activatePhase2","inputs":[],"outputs":[],"stateMutability":"nonpayable"},
-      {"type":"function","name":"isQualified","inputs":[{"name":"investor","type":"address"}],"outputs":[{"name":"","type":"bool"}],"stateMutability":"view"},
-      {"type":"function","name":"isPhase2Active","inputs":[],"outputs":[{"name":"","type":"bool"}],"stateMutability":"view"},
+      {"type":"function","name":"deactivatePhase2","inputs":[],"outputs":[],"stateMutability":"nonpayable"},
+      {"type":"function","name":"isQualifiedInvestor","inputs":[{"name":"","type":"address"}],"outputs":[{"name":"","type":"bool"}],"stateMutability":"view"},
+      {"type":"function","name":"investorBalance","inputs":[{"name":"","type":"address"}],"outputs":[{"name":"","type":"uint256"}],"stateMutability":"view"},
+      {"type":"function","name":"phase2Active","inputs":[],"outputs":[{"name":"","type":"bool"}],"stateMutability":"view"},
+      {"type":"function","name":"totalMinted","inputs":[],"outputs":[{"name":"","type":"uint256"}],"stateMutability":"view"},
+      {"type":"function","name":"totalInvestors","inputs":[],"outputs":[{"name":"","type":"uint256"}],"stateMutability":"view"},
       {"type":"function","name":"balanceOf","inputs":[{"name":"owner","type":"address"}],"outputs":[{"name":"","type":"uint256"}],"stateMutability":"view"},
       {"type":"function","name":"tokenURI","inputs":[{"name":"tokenId","type":"uint256"}],"outputs":[{"name":"","type":"string"}],"stateMutability":"view"},
-      {"type":"function","name":"locked","inputs":[{"name":"tokenId","type":"uint256"}],"outputs":[{"name":"","type":"bool"}],"stateMutability":"view"},
-      {"type":"event","name":"QualifiedInvestorAdded","inputs":[{"name":"investor","type":"address","indexed":true}]},
-      {"type":"event","name":"Redeemed","inputs":[{"name":"tokenId","type":"uint256","indexed":true},{"name":"owner","type":"address","indexed":true}]},
-      {"type":"event","name":"Phase2Activated","inputs":[]},
-      {"type":"event","name":"Locked","inputs":[{"name":"tokenId","type":"uint256","indexed":true}]}
+      {"type":"event","name":"InvestorWhitelisted","inputs":[{"name":"investor","type":"address","indexed":true},{"name":"timestamp","type":"uint256","indexed":false}]},
+      {"type":"event","name":"InvestorRemovedFromWhitelist","inputs":[{"name":"investor","type":"address","indexed":true},{"name":"timestamp","type":"uint256","indexed":false}]},
+      {"type":"event","name":"CertificateMinted","inputs":[{"name":"investor","type":"address","indexed":true},{"name":"tokenId","type":"uint256","indexed":true},{"name":"timestamp","type":"uint256","indexed":false}]},
+      {"type":"event","name":"CertificateRedeemed","inputs":[{"name":"investor","type":"address","indexed":true},{"name":"tokenId","type":"uint256","indexed":true},{"name":"timestamp","type":"uint256","indexed":false}]},
+      {"type":"event","name":"Phase2Activated","inputs":[{"name":"activator","type":"address","indexed":true},{"name":"timestamp","type":"uint256","indexed":false}]},
+      {"type":"event","name":"Phase2Deactivated","inputs":[{"name":"activator","type":"address","indexed":true},{"name":"timestamp","type":"uint256","indexed":false}]}
     ],
     /* ERC-3643 (T-REX) — Token de seguridad transferible con Identity Registry */
     TREXToken: [
@@ -187,7 +217,8 @@ window.TOKEN_STRATEGIES = {
 };
 /* Backend TOKAI RWA — conectar frontend con la API real.
    Si no está seteado, la plataforma sigue en modo demo. */
-window.__API_URL__ = 'https://tokai-backend.fly.dev/api/v1';</script><script type="text/babel" data-presets="react">/* ════════════════════════════════════════════════════════════════════
+window.__API_URL__ = 'https://tokai-backend.fly.dev/api/v1';
+window.__TOKAI_ENABLE_LIVE_MODE__ = window.__TOKAI_ENABLE_LIVE_MODE__ !== false;</script><script type="text/babel" data-presets="react">/* ════════════════════════════════════════════════════════════════════
    TOKAI Platform — MVP demostrable
    Motor de simulación que REFLEJA EXACTAMENTE la lógica de los contratos
    ERC-3643 ya compilados y testeados (9/9 tests EVM pasando).
@@ -198,6 +229,16 @@ const h = React.createElement;
 /* ─── Jurisdicciones ISO ─── */
 const JUR = { 32:'🇦🇷 Argentina', 840:'🇺🇸 Estados Unidos', 724:'🇪🇸 España', 76:'🇧🇷 Brasil', 152:'🇨🇱 Chile' };
 const CAT = { 1:'Retail', 2:'Calificado', 3:'Institucional' };
+
+function apiPath(base, path){
+  if(!base) return path;
+  const cleanBase = String(base).replace(/\/+$/,'');
+  const cleanPath = String(path || '').replace(/^\/+/,'');
+  if(cleanBase.endsWith('/api/v1') && cleanPath.startsWith('api/v1/')){
+    return cleanBase + '/' + cleanPath.slice(7);
+  }
+  return cleanBase + '/' + cleanPath;
+}
 
 /* ─── Estado inicial de la cadena (refleja deployment-amoy.json) ─── */
 function genAddr(seed){ let s=0; for(const c of seed) s=(s*31+c.charCodeAt(0))>>>0; let hex=''; for(let i=0;i<40;i++){ s=(s*1103515245+12345)>>>0; hex+=(s%16).toString(16);} return '0x'+hex; }
@@ -349,7 +390,7 @@ function useChain(opts){
   /* ── Carga proyectos del backend al iniciar sesión ── */
   function syncProjects(){
     if(!opts || !opts.apiUrl || !opts.loggedIn) return;
-    fetch(opts.apiUrl + '/api/v1/projects', { credentials: 'include' })
+    fetch(apiPath(opts.apiUrl, '/api/v1/projects'), { credentials: 'include' })
     .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
     .then(function(data){
       if(Array.isArray(data.projects) && data.projects.length > 0){
@@ -516,9 +557,9 @@ function useChain(opts){
     log('ProjectCreated', `${cfg.name} (${cfg.symbol})`);
 
     // persistir en backend si hay sesión
-    if(opts && opts.jwt && opts.apiUrl){
+    if(opts && opts.loggedIn && opts.apiUrl){
       try{
-        const res = await fetch(opts.apiUrl + '/api/v1/projects', {
+        const res = await fetch(apiPath(opts.apiUrl, '/api/v1/projects'), {
           method: 'POST',
           credentials: 'include',
           headers: {'Content-Type':'application/json'},
@@ -546,9 +587,9 @@ function useChain(opts){
   async function updateProject(id, patch){
     setProjects(ps=>ps.map(p=>p.id===id?{...p,...patch}:p));
     log('ProjectUpdated', `Proyecto ${id} actualizado`);
-    if(opts && opts.jwt && opts.apiUrl){
+    if(opts && opts.loggedIn && opts.apiUrl){
       try{
-        await fetch(opts.apiUrl + '/api/v1/projects/' + id, {
+        await fetch(apiPath(opts.apiUrl, '/api/v1/projects/' + id), {
           method: 'PATCH',
           credentials: 'include',
         headers: {'Content-Type':'application/json'},
@@ -652,6 +693,18 @@ function web3Available(){
   return typeof window !== 'undefined' && !!window.ethereum && !!window.ethers && !!window.__DEPLOYMENT__;
 }
 
+/* Obtiene el provider de MetaMask directamente, evitando agregadores de wallets */
+function getMetaMaskProvider(){
+  if(!window.ethereum) return null;
+  // Escenario multi-wallet: providers[] se puebla cuando hay varias extensiones instaladas
+  if(Array.isArray(window.ethereum.providers)){
+    return window.ethereum.providers.find(p=>p.isMetaMask) || null;
+  }
+  // Wallet única — verificar que sea MetaMask
+  if(window.ethereum.isMetaMask) return window.ethereum;
+  return null;
+}
+
 /* Hook de conexión Web3. Devuelve estado de wallet y helpers. */
 function useWeb3(){
   const [account,setAccount] = useState(null);
@@ -660,49 +713,77 @@ function useWeb3(){
   const [error,setError] = useState(null);
 
   async function connect(){
-    if(!window.ethereum){ setError('No se detectó MetaMask. Instalalo para operar en vivo.'); return false; }
+    const provider = getMetaMaskProvider();
+    if(!provider){ setError('No se detectó MetaMask. Instalalo para operar en vivo.'); return false; }
     setConnecting(true); setError(null);
     try{
-      const accs = await window.ethereum.request({ method:'eth_requestAccounts' });
+      // Primero intentar eth_accounts (sin prompt): si ya hay permisos los devuelve directo
+      let accs = await provider.request({ method:'eth_accounts' });
+      if(!accs || !accs[0]){
+        // No hay permisos previos: pedir conexión
+        accs = await provider.request({ method:'eth_requestAccounts' });
+      }
       const activeAccount = accs && accs[0];
       if(!activeAccount) throw new Error('MetaMask no devolvio una cuenta activa.');
       setAccount(activeAccount);
       // verificar red
-      const cid = await window.ethereum.request({ method:'eth_chainId' });
+      const cid = await provider.request({ method:'eth_chainId' });
       if(cid !== getActiveNetwork().chainIdHex){
         try{
-          await window.ethereum.request({ method:'wallet_switchEthereumChain', params:[{chainId:getActiveNetwork().chainIdHex}] });
+          await provider.request({ method:'wallet_switchEthereumChain', params:[{chainId:getActiveNetwork().chainIdHex}] });
         }catch(switchErr){
           if(switchErr.code === 4902){
-            await window.ethereum.request({ method:'wallet_addEthereumChain', params:[getActiveNetwork().params] });
+            await provider.request({ method:'wallet_addEthereumChain', params:[getActiveNetwork().params] });
           } else throw switchErr;
         }
       }
       setChainOk(true);
       return activeAccount;
-    }catch(e){ setError(e.message || 'Error de conexión'); return false; }
+    }catch(e){
+      if(e.code===-32002){
+        // Solicitud pendiente atrapada internamente — intentar eth_accounts como fallback
+        try{
+          const fallbackAccs = await provider.request({ method:'eth_accounts' });
+          if(fallbackAccs && fallbackAccs[0]){
+            setAccount(fallbackAccs[0]);
+            const cid = await provider.request({ method:'eth_chainId' });
+            setChainOk(cid === getActiveNetwork().chainIdHex);
+            return fallbackAccs[0];
+          }
+        }catch(_){}
+        const msg = 'MetaMask tiene una solicitud bloqueada. Cerrá y volvé a abrir MetaMask, luego intentá de nuevo.';
+        setError(msg); return { error: msg };
+      }
+      const msg = e.code===4001
+        ? 'Conexión rechazada. Aprobá la solicitud en MetaMask para continuar.'
+        : (e.message || 'Error de conexión');
+      setError(msg);
+      return { error: msg };
+    }
     finally{ setConnecting(false); }
   }
 
   useEffect(()=>{
-    if(!window.ethereum) return;
+    const provider = getMetaMaskProvider();
+    if(!provider) return;
     const onAcc = (accs)=> setAccount(accs[0]||null);
     const onChain = (cid)=> setChainOk(cid===getActiveNetwork().chainIdHex);
-    window.ethereum.on && window.ethereum.on('accountsChanged', onAcc);
-    window.ethereum.on && window.ethereum.on('chainChanged', onChain);
-    return ()=>{ if(window.ethereum.removeListener){ window.ethereum.removeListener('accountsChanged',onAcc); window.ethereum.removeListener('chainChanged',onChain); } };
+    provider.on && provider.on('accountsChanged', onAcc);
+    provider.on && provider.on('chainChanged', onChain);
+    return ()=>{ if(provider.removeListener){ provider.removeListener('accountsChanged',onAcc); provider.removeListener('chainChanged',onChain); } };
   },[]);
 
   async function switchNetwork(){
-    if(!window.ethereum) return false;
+    const provider = getMetaMaskProvider();
+    if(!provider) return false;
     const net = getActiveNetwork();
     try{
-      await window.ethereum.request({ method:'wallet_switchEthereumChain', params:[{chainId:net.chainIdHex}] });
+      await provider.request({ method:'wallet_switchEthereumChain', params:[{chainId:net.chainIdHex}] });
       setChainOk(true); return true;
     }catch(e){
       if(e.code===4902){
         try{
-          await window.ethereum.request({ method:'wallet_addEthereumChain', params:[net.params] });
+          await provider.request({ method:'wallet_addEthereumChain', params:[net.params] });
           setChainOk(true); return true;
         }catch(_){ return false; }
       }
@@ -710,7 +791,7 @@ function useWeb3(){
     }
   }
 
-  return { account, chainOk, connecting, error, connect, switchNetwork, available: !!(window.ethereum) };
+  return { account, chainOk, connecting, error, connect, switchNetwork, available: !!(getMetaMaskProvider()) };
 }
 
 /* ─── Capa de contratos en vivo (ethers v6) ───
@@ -1056,7 +1137,7 @@ function useGate(){
 }
 
 /* ════════════════════════ DASHBOARD ════════════════════════ */
-function Dashboard({chain,go}){
+function Dashboard({chain,go,liveMode,liveWalletAddr}){
   const totalRaised = chain.projects.reduce((s,p)=>s+p.raised,0);
   const totalHolders = new Set(Object.keys(chain.balances).filter(k=>chain.balances[k]>0).map(k=>k.split(':')[1])).size;
   const kycCount = Object.values(chain.identities).filter(i=>i.verified).length;
@@ -1064,6 +1145,7 @@ function Dashboard({chain,go}){
     h('div',{className:'eyebrow'},'Panel general'),
     h('h1',{className:'page'},'Plataforma TOKAI'),
     h('p',{className:'page-sub'},'Infraestructura de tokenización RWA con compliance ERC-3643 integrado. Multi-proyecto sobre un único registro de identidad: el inversor verifica KYC una vez y opera en todos los proyectos compatibles con su jurisdicción.'),
+    liveMode==='real'&&h(PreGATLiveCard,{walletAddr:liveWalletAddr}),
     h('div',{className:'grid',style:{gridTemplateColumns:'repeat(4,1fr)',marginBottom:24}},
       h('div',{className:'card stat-card'},h('div',{className:'stat-label'},'Capital colocado'),h('div',{className:'stat-val emerald'},'$'+fmt(totalRaised)),h('div',{className:'stat-delta up'},'▲ across '+chain.projects.length+' proyectos')),
       h('div',{className:'card stat-card'},h('div',{className:'stat-label'},'Proyectos activos'),h('div',{className:'stat-val'},chain.projects.length),h('div',{className:'stat-delta muted'},'1 registry compartido')),
@@ -1263,7 +1345,7 @@ function AdminView({chain,wallet,toast,subView}){
     h('h1',{className:'page'},'Administración'),
     h('p',{className:'page-sub'},'Gestión de proyectos, emisión primaria, distribución de yield, identidades y contenido de pitch para inversores.'),
     !subView && h('div',{className:'role-switch',style:{marginBottom:22,width:'fit-content'}},
-      [['projects','Proyectos'],['pitch','Pitch del emisor'],['emission','Estado emisión'],['mint','Emisión'],['yield','Yield'],['kyc','Identidades']].map(([k,l])=>
+      [['projects','Proyectos'],['pitch','Pitch del emisor'],['emission','Estado emisión'],['mint','Emisión'],['yield','Yield'],['kyc','Identidades'],['pregat','PRE-GAT ✦']].map(([k,l])=>
         h('button',{key:k,className:'role-btn '+(tab===k?'active':''),onClick:()=>setTabState(k)},l))),
     tab==='projects'&&h(AdminProjects,{chain,toast}),
     tab==='pitch'&&h(AdminPitch,{chain,toast}),
@@ -1271,6 +1353,7 @@ function AdminView({chain,wallet,toast,subView}){
     tab==='mint'&&h(AdminMint,{chain,toast}),
     tab==='yield'&&h(AdminYield,{chain,toast}),
     tab==='kyc'&&h(AdminKycDual,{chain,toast}),
+    tab==='pregat'&&h(PreGATAdminPanel,{toast}),
   );
 }
 
@@ -1960,7 +2043,7 @@ function RedeemModal({p, bal, onClose, onSuccess, chain, toast}){
 /* ─────────────────────── CARTERA DEL INVERSOR ─────────────────────── */
 /* Lo que Reental hace bien: vista consolidada de todas las posiciones,
    histórico de rentas, reinversión. Aquí con el balance real on-chain.  */
-function PortfolioView({chain,wallet,toast,go}){
+function PortfolioView({chain,wallet,toast,go,liveMode,liveWalletAddr}){
   const id = chain.identities[wallet.addr];
   const positions = chain.projects.map(p=>({p,bal:chain.bal(p.id,wallet.addr),claimable:chain.claimableYield(p.id,wallet.addr)})).filter(x=>x.bal>0);
   const totalValue = positions.reduce((s,x)=>s+x.bal*(x.p.priceUsdCents/100),0);
@@ -1979,6 +2062,7 @@ function PortfolioView({chain,wallet,toast,go}){
     h('div',{className:'eyebrow'},'Mi cartera'),
     h('h1',{className:'page'},'Posición consolidada'),
     h('p',{className:'page-sub'},'Todas tus inversiones en un solo lugar: balance, renta acumulada y acciones rápidas. Como inversor verificado, operás en todos los proyectos compatibles con tu jurisdicción.'),
+    liveMode==='real'&&h(PreGATLiveCard,{walletAddr:liveWalletAddr}),
     !id||!id.verified?h('div',{className:'card',style:{textAlign:'center',padding:'40px'}},
       h(Icon,{d:I.wallet,style:{width:36,height:36,margin:'0 auto 14px',opacity:.4}}),
       h('h3',{style:{fontSize:16,fontWeight:700,marginBottom:6}},'Verificá tu identidad para empezar'),
@@ -2055,7 +2139,9 @@ function PortfolioView({chain,wallet,toast,go}){
             }))
           )
         )
-      )
+      ),
+      /* ── PRE-GAT on-chain (Polygon PoS mainnet) ── */
+      h(PreGATInvestorCard,{walletAddr:wallet&&wallet.addr,toast})
     )
   );
 }
@@ -2483,21 +2569,22 @@ function LoginGate({onLogin, web3, toast}){
       setError('');
       const result = await Promise.race([
         web3.connect(),
-        new Promise(resolve=>setTimeout(()=>resolve('__TOKAI_WALLET_TIMEOUT__'),45000))
+        new Promise(resolve=>setTimeout(()=>resolve('__TOKAI_WALLET_TIMEOUT__'),15000))
       ]);
       if(result==='__TOKAI_WALLET_TIMEOUT__'){
         setPhase('input');
-        toast&&toast({type:'warn',title:'MetaMask no respondio',msg:'Abrí MetaMask y confirmá la conexión, o intentá nuevamente.'});
+        toast&&toast({type:'warn',title:'MetaMask no respondió',msg:'Hacé clic en el ícono de MetaMask en la barra del navegador y aprobá la conexión, luego intentá de nuevo.'});
         return;
       }
-      if(result){
-        const connectedAccount = typeof result==='string' ? result : web3.account;
+      if(result && typeof result==='string'){
         setPhase('input');
-        onLogin({method:'wallet', id:connectedAccount, label:short(connectedAccount), role:'investor', approved:true});
+        onLogin({method:'wallet', id:result, label:short(result), role:'investor', approved:true});
         return;
       }
       setPhase('input');
-      toast&&toast({type:'err',title:'No se pudo conectar',msg:web3.error || 'MetaMask rechazó o no completó la conexión.'});
+      const errMsg = (result && result.error) ? result.error : 'MetaMask rechazó o no completó la conexión.';
+      setError(errMsg);
+      toast&&toast({type:'err',title:'No se pudo conectar',msg:errMsg});
     } else {
       onLogin({method:'wallet', id:'0xDEMO', label:'Wallet demo', role:'investor', approved:true});
     }
@@ -2507,7 +2594,7 @@ function LoginGate({onLogin, web3, toast}){
   const inpOtp = Object.assign({},inp,{letterSpacing:'0.35em',fontSize:22,fontWeight:700,textAlign:'center',fontFamily:'var(--mono)'});
 
   return h('div',{style:{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',padding:20,background:'var(--black)'}},
-    h('div',{style:{width:'100%',maxWidth:380}},
+    h('div',{style:{width:'100%',maxWidth:520}},
 
       /* Logo + título → landing */
       h('a',{href:'/',style:{display:'block',textAlign:'center',marginBottom:28,textDecoration:'none',color:'inherit'}},
@@ -2521,9 +2608,9 @@ function LoginGate({onLogin, web3, toast}){
         /* Tabs email / wallet */
         phase==='input'&&h('div',{style:{display:'flex',gap:6,marginBottom:18,background:'var(--black)',padding:4,borderRadius:10}},
           h('button',{onClick:()=>setTab('email'),style:{flex:1,padding:'9px',borderRadius:7,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,
-            background:tab==='email'?'var(--emerald)':'transparent',color:tab==='email'?'#001a10':'var(--txt-dim)'}},'Con email'),
+            background:tab==='email'?'var(--emerald)':'transparent',color:tab==='email'?'#001a10':'var(--txt-dim)'}},'Emisores / Admins'),
           h('button',{onClick:()=>setTab('wallet'),style:{flex:1,padding:'9px',borderRadius:7,border:'none',cursor:'pointer',fontSize:13,fontWeight:600,
-            background:tab==='wallet'?'var(--emerald)':'transparent',color:tab==='wallet'?'#001a10':'var(--txt-dim)'}},'Con wallet')),
+            background:tab==='wallet'?'var(--emerald)':'transparent',color:tab==='wallet'?'#001a10':'var(--txt-dim)'}},'Inversores')),
 
         /* Error */
         error&&h('div',{style:{padding:'9px 12px',borderRadius:8,background:'rgba(255,92,92,.08)',border:'1px solid rgba(255,92,92,.2)',color:'#FF5C5C',fontSize:12,marginBottom:14}},error),
@@ -2564,25 +2651,30 @@ function LoginGate({onLogin, web3, toast}){
 
         /* ── FASE: wallet ── */
         tab==='wallet'&&phase==='input'&&h('div',{},
-          h('p',{style:{fontSize:12.5,color:'var(--txt-dim)',lineHeight:1.6,marginBottom:14}},
+          h('p',{style:{fontSize:12.5,color:'var(--txt-dim)',lineHeight:1.6,marginBottom:6}},
             web3&&web3.available
-              ?'Conectá tu wallet MetaMask para firmar el acceso con tu clave privada. No se cobra gas.'
-              :'No detectamos MetaMask. Podés entrar con una wallet de demostración.'),
+              ?'Acceso para inversores. Conectá tu wallet para ver tu portfolio y operar.'
+              :'No detectamos MetaMask. Podés explorar con una wallet de demostración.'),
+          h('p',{style:{fontSize:11,color:'var(--txt-mute)',lineHeight:1.4,marginBottom:14}},
+            '¿Querés presentar un proyecto? Usá el acceso por email (tab izquierdo).'),
           h('button',{className:'btn btn-primary',style:{width:'100%'},onClick:loginWallet},
-            web3&&web3.available?'Conectar MetaMask →':'Entrar con wallet demo →'),
+            web3&&web3.available?'Conectar wallet →':'Explorar en modo demo →'),
           h('p',{style:{fontSize:10.5,color:'var(--txt-mute)',marginTop:10,lineHeight:1.4,textAlign:'center'}},
-            'Tu firma cripto verifica la identidad. Compatible con MetaMask, Rainbow, Coinbase Wallet.')),
+            'Compatible con MetaMask, Rainbow, Coinbase Wallet.')),
 
         /* ── FASE: esperando firma wallet ── */
         phase==='signing'&&h('div',{style:{textAlign:'center',padding:'24px 0'}},
           h('div',{style:{fontSize:32,marginBottom:12}},'🦊'),
           h('div',{style:{fontSize:14,fontWeight:600,marginBottom:8}},'Esperando MetaMask'),
-          h('div',{style:{fontSize:12,color:'var(--txt-mute)',lineHeight:1.5,marginBottom:14}},'Revisa la ventana emergente de MetaMask y confirma la conexion.'),
+          h('div',{style:{fontSize:12,color:'var(--txt-mute)',lineHeight:1.5,marginBottom:6}},'Buscá la ventana emergente de MetaMask o hacé clic en el ícono 🦊 en la barra de extensiones del navegador.'),
+          h('div',{style:{fontSize:11,color:'var(--txt-mute)',lineHeight:1.4,marginBottom:16}},'Si no aparece nada, puede haber una solicitud pendiente — abrí MetaMask manualmente y revisá notificaciones pendientes.'),
           h('button',{className:'btn btn-ghost btn-sm',onClick:resetToInput},'Cancelar'))),
 
       /* Footer */
       h('p',{style:{fontSize:10,color:'var(--txt-mute)',marginTop:16,textAlign:'center',lineHeight:1.5}},
-        'TOKAI estructura y supervisa. Nunca es el PSAV ni custodia fondos.')
+        'TOKAI estructura y supervisa. Nunca es el PSAV ni custodia fondos.'),
+      h('div',{style:{marginTop:18}},
+        h(PreGATLiveCard,{walletAddr:null,compact:true}))
     ));
 }
 
@@ -3197,7 +3289,7 @@ function ThesisFlexEditor({chain, toast, go}){
       const apiUrl = window.__API_URL__ || '';
       if(apiUrl){
         const backendStatus = s === 'enviada' ? 'sent' : s === 'confirmada' ? 'confirmed' : 'draft';
-        fetch(apiUrl + '/api/v1/projects/' + p2.id + '/thesis', {
+        fetch(apiPath(apiUrl, '/api/v1/projects/' + p2.id + '/thesis'), {
           method: 'PUT',
           credentials: 'include',
           headers: {'Content-Type':'application/json'},
@@ -3508,7 +3600,7 @@ function ThesisClientView({chain, toast}){
             if(p.id && typeof p.id === 'string' && p.id.length === 36){
               const apiUrl = window.__API_URL__ || '';
               if(apiUrl){
-                fetch(apiUrl + '/api/v1/projects/' + p.id + '/thesis', {
+                fetch(apiPath(apiUrl, '/api/v1/projects/' + p.id + '/thesis'), {
                   method: 'PUT',
                   credentials: 'include',
                   headers: {'Content-Type':'application/json'},
@@ -5657,6 +5749,509 @@ function AdminWhitelist({ chain, toast }) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   PRE-GAT INTEGRATION v1.0 — Polygon PoS mainnet (chainId 137)
+   Hook + Panel de administración + Vista de inversores
+   Contrato: 0xf9e16618297e51C6908746C86B115C5497672A53
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ABI mínimo para leer el estado del instrumento sin depender de window.__ABIS__ */
+var PREGAT_READ_ABI = [
+  "function instrumentStatus() view returns (uint256,uint256,uint256,uint256,uint256,bool,uint256)",
+  "function isQualifiedInvestor(address) view returns (bool)",
+  "function investorBalance(address) view returns (uint256)",
+  "function phase2Active() view returns (bool)",
+  "function balanceOf(address) view returns (uint256)"
+];
+
+function usePreGAT(walletAddr) {
+  var cfg = (typeof window !== 'undefined') && window.__PREGAT__;
+  var [status, setStatus] = useState(null);
+  var [loading, setLoading] = useState(false);
+  var [error, setError] = useState(null);
+  var [investorInfo, setInvestorInfo] = useState(null);
+
+  function normalizeStatus(s) {
+    return {
+      totalMinted:            Number(s[0]),
+      totalRedeemed:          Number(s[1]),
+      totalInvestors:         Number(s[2]),
+      remainingSupply:        Number(s[3]),
+      remainingInvestorSlots: Number(s[4]),
+      phase2Active:           s[5],
+      capitalRaisedUSD:       Number(s[6]),
+    };
+  }
+
+  function snapshotStatus() {
+    if (!cfg || !cfg.snapshot) return null;
+    return Object.assign({
+      totalMinted: 0,
+      totalRedeemed: 0,
+      totalInvestors: 0,
+      remainingSupply: 500,
+      remainingInvestorSlots: 50,
+      phase2Active: false,
+      capitalRaisedUSD: 0,
+    }, cfg.snapshot);
+  }
+
+  async function loadStatus() {
+    if (!cfg || !window.ethers) {
+      var snap = snapshotStatus();
+      if (snap) setStatus(snap);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      var provider = new ethers.JsonRpcProvider(cfg.rpc);
+      var contract = new ethers.Contract(cfg.address, PREGAT_READ_ABI, provider);
+      var s = await contract.instrumentStatus();
+      setStatus(normalizeStatus(s));
+    } catch(e) {
+      // Intentar RPC fallback
+      try {
+        var p2 = new ethers.JsonRpcProvider(cfg.rpcFallback || cfg.rpc);
+        var c2 = new ethers.Contract(cfg.address, PREGAT_READ_ABI, p2);
+        var s2 = await c2.instrumentStatus();
+        setStatus(normalizeStatus(s2));
+      } catch(e2) {
+        var snap2 = snapshotStatus();
+        if (snap2) {
+          setStatus(snap2);
+          setError('Mostrando snapshot local; RPC Polygon no disponible');
+        } else {
+          setError('No se pudo conectar a Polygon PoS mainnet');
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadInvestorInfo(addr) {
+    if (!cfg || !window.ethers || !addr) return;
+    try {
+      var provider = new ethers.JsonRpcProvider(cfg.rpc);
+      var contract = new ethers.Contract(cfg.address, PREGAT_READ_ABI, provider);
+      var [isQual, balance] = await Promise.all([
+        contract.isQualifiedInvestor(addr),
+        contract.investorBalance(addr)
+      ]);
+      setInvestorInfo({ isQualified: isQual, balance: Number(balance) });
+    } catch(e) {
+      setInvestorInfo(null);
+    }
+  }
+
+  /* Cambia la red de MetaMask a Polygon PoS mainnet y devuelve el signer */
+  async function getPreGATSigner() {
+    if (!window.ethereum || !cfg) throw new Error('MetaMask no disponible');
+    var mm = (function(){
+      if (Array.isArray(window.ethereum.providers))
+        return window.ethereum.providers.find(function(p){ return p.isMetaMask; }) || null;
+      return window.ethereum.isMetaMask ? window.ethereum : null;
+    })();
+    if (!mm) throw new Error('MetaMask no encontrado');
+    var currentChain = await mm.request({ method: 'eth_chainId' });
+    if (parseInt(currentChain, 16) !== cfg.chainId) {
+      try {
+        await mm.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x89' }] });
+      } catch(swErr) {
+        if (swErr.code === 4902) {
+          await mm.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x89', chainName: 'Polygon PoS', nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 }, rpcUrls: [cfg.rpc], blockExplorerUrls: [cfg.explorer] }] });
+        } else throw swErr;
+      }
+    }
+    var provider = new ethers.BrowserProvider(mm);
+    return provider.getSigner();
+  }
+
+  async function whitelistInvestor(addr) {
+    var signer = await getPreGATSigner();
+    var abi = (window.__ABIS__ && window.__ABIS__.GATCertificate) || PREGAT_READ_ABI;
+    var contract = new ethers.Contract(cfg.address, abi, signer);
+    var tx = await contract.addQualifiedInvestor(addr);
+    await tx.wait();
+    return tx.hash;
+  }
+
+  async function removeInvestor(addr) {
+    var signer = await getPreGATSigner();
+    var abi = (window.__ABIS__ && window.__ABIS__.GATCertificate) || PREGAT_READ_ABI;
+    var contract = new ethers.Contract(cfg.address, abi, signer);
+    var tx = await contract.removeQualifiedInvestor(addr);
+    await tx.wait();
+    return tx.hash;
+  }
+
+  async function mintTo(addr, qty) {
+    var signer = await getPreGATSigner();
+    var abi = (window.__ABIS__ && window.__ABIS__.GATCertificate) || PREGAT_READ_ABI;
+    var contract = new ethers.Contract(cfg.address, abi, signer);
+    var tx = qty > 1 ? await contract.batchMint(addr, qty) : await contract.mint(addr);
+    await tx.wait();
+    return tx.hash;
+  }
+
+  async function togglePhase2(activate) {
+    var signer = await getPreGATSigner();
+    var abi = (window.__ABIS__ && window.__ABIS__.GATCertificate) || PREGAT_READ_ABI;
+    var contract = new ethers.Contract(cfg.address, abi, signer);
+    var tx = activate ? await contract.activatePhase2() : await contract.deactivatePhase2();
+    await tx.wait();
+    return tx.hash;
+  }
+
+  useEffect(function(){ loadStatus(); }, []);
+  useEffect(function(){ if (walletAddr) loadInvestorInfo(walletAddr); }, [walletAddr]);
+
+  return { cfg, status, loading, error, investorInfo, loadStatus, loadInvestorInfo, whitelistInvestor, removeInvestor, mintTo, togglePhase2 };
+}
+
+/* Panel de administración PRE-GAT — solo para admin/TOKAI */
+function PreGATAdminPanel({ toast }) {
+  var pg = usePreGAT(null);
+  var cfg = pg.cfg;
+  var s = pg.status;
+
+  var [tab, setTab] = useState('dashboard');
+  var [wlAddr, setWlAddr] = useState('');
+  var [mintAddr, setMintAddr] = useState('');
+  var [mintQty, setMintQty] = useState(1);
+  var [checkAddr, setCheckAddr] = useState('');
+  var [checkResult, setCheckResult] = useState(null);
+  var [txLoading, setTxLoading] = useState(false);
+
+  var isValidAddr = function(a){ return /^0x[0-9a-fA-F]{40}$/.test(a); };
+  var explorerTx = function(hash){ return (cfg ? cfg.explorer : 'https://polygonscan.com') + '/tx/' + hash; };
+  var explorerAddr = function(addr){ return (cfg ? cfg.explorer : 'https://polygonscan.com') + '/address/' + addr; };
+
+  async function doWhitelist() {
+    if (!isValidAddr(wlAddr)) return;
+    setTxLoading(true);
+    try {
+      var hash = await pg.whitelistInvestor(wlAddr);
+      toast && toast({ title: 'Whitelist on-chain', msg: wlAddr.slice(0,10)+'… habilitado', hash: hash });
+      setWlAddr('');
+      await pg.loadStatus();
+    } catch(e) {
+      toast && toast({ type: 'err', title: 'Error whitelist', msg: e.message });
+    }
+    setTxLoading(false);
+  }
+
+  async function doRemove() {
+    if (!isValidAddr(wlAddr)) return;
+    setTxLoading(true);
+    try {
+      var hash = await pg.removeInvestor(wlAddr);
+      toast && toast({ title: 'Removido de whitelist', msg: wlAddr.slice(0,10)+'… removido', hash: hash });
+      setWlAddr('');
+      await pg.loadStatus();
+    } catch(e) {
+      toast && toast({ type: 'err', title: 'Error', msg: e.message });
+    }
+    setTxLoading(false);
+  }
+
+  async function doMint() {
+    if (!isValidAddr(mintAddr) || mintQty < 1) return;
+    setTxLoading(true);
+    try {
+      var hash = await pg.mintTo(mintAddr, mintQty);
+      toast && toast({ title: 'PRE-GAT emitido', msg: mintQty+' certificado(s) → '+mintAddr.slice(0,10)+'…', hash: hash });
+      setMintAddr(''); setMintQty(1);
+      await pg.loadStatus();
+    } catch(e) {
+      toast && toast({ type: 'err', title: 'Error mint', msg: e.message });
+    }
+    setTxLoading(false);
+  }
+
+  async function doCheckInvestor() {
+    if (!isValidAddr(checkAddr)) return;
+    setTxLoading(true);
+    try {
+      await pg.loadInvestorInfo(checkAddr);
+      setCheckResult(pg.investorInfo);
+    } catch(e) {
+      setCheckResult(null);
+    }
+    setTxLoading(false);
+  }
+
+  async function doTogglePhase2() {
+    setTxLoading(true);
+    try {
+      var activate = !(s && s.phase2Active);
+      var hash = await pg.togglePhase2(activate);
+      toast && toast({ title: activate ? 'Fase 2 activada' : 'Fase 2 desactivada', msg: 'Inversores pueden canjear PRE-GAT → GAT', hash: hash });
+      await pg.loadStatus();
+    } catch(e) {
+      toast && toast({ type: 'err', title: 'Error Fase 2', msg: e.message });
+    }
+    setTxLoading(false);
+  }
+
+  var tabs = [['dashboard','Dashboard'],['whitelist','Whitelist KYC'],['mint','Emisión'],['phase2','Fase 2']];
+
+  var pct = function(n, d){ return d > 0 ? ((n/d)*100).toFixed(1) : '0.0'; };
+
+  return h('div', {},
+    /* Header */
+    h('div', { style: { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 } },
+      h('div', { style: { background: 'rgba(0,214,126,.12)', border: '1px solid rgba(0,214,126,.25)', borderRadius: 10, padding: '10px 14px' } },
+        h('div', { style: { fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--emerald)', letterSpacing: '.1em', marginBottom: 3 } }, 'PRE-GAT · POLYGON POS MAINNET'),
+        cfg && h('div', { style: { fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--txt-dim)' } },
+          h('a', { href: explorerAddr(cfg.address), target: '_blank', rel: 'noopener noreferrer', style: { color: 'var(--emerald)', textDecoration: 'none' } }, cfg.address.slice(0,10)+'…'+cfg.address.slice(-6))
+        )
+      ),
+      h('button', { className: 'btn btn-ghost btn-sm', onClick: pg.loadStatus, disabled: pg.loading }, pg.loading ? '…' : '↻ Actualizar'),
+      pg.error && h('span', { style: { color: 'var(--red)', fontSize: 12 } }, pg.error)
+    ),
+
+    /* Tabs */
+    h('div', { className: 'role-switch', style: { marginBottom: 18, width: 'fit-content' } },
+      tabs.map(function([k, l]){ return h('button', { key: k, className: 'role-btn ' + (tab === k ? 'active' : ''), onClick: function(){ setTab(k); } }, l); })
+    ),
+
+    /* Dashboard */
+    tab === 'dashboard' && h('div', {},
+      pg.loading && !s ? h('div', { style: { color: 'var(--txt-mute)', fontSize: 13, padding: '20px 0' } }, 'Cargando estado on-chain de Polygon PoS mainnet…') :
+      !s ? h('div', { style: { color: 'var(--txt-mute)', fontSize: 13, padding: '20px 0' } }, 'Sin datos. Verificá conexión a Polygon PoS mainnet.') :
+      h('div', {},
+        h('div', { className: 'grid', style: { gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 } },
+          h('div', { className: 'card stat-card' },
+            h('div', { className: 'stat-label' }, 'Certificados emitidos'),
+            h('div', { className: 'stat-val emerald' }, s.totalMinted),
+            h('div', { className: 'stat-delta muted' }, 'de 500 · ' + pct(s.totalMinted, 500) + '%')
+          ),
+          h('div', { className: 'card stat-card' },
+            h('div', { className: 'stat-label' }, 'Capital recaudado'),
+            h('div', { className: 'stat-val' }, 'USD ' + s.capitalRaisedUSD.toLocaleString()),
+            h('div', { className: 'stat-delta muted' }, pct(s.capitalRaisedUSD, 1500000) + '% del target')
+          ),
+          h('div', { className: 'card stat-card' },
+            h('div', { className: 'stat-label' }, 'Inversores'),
+            h('div', { className: 'stat-val' }, s.totalInvestors),
+            h('div', { className: 'stat-delta muted' }, 'de 50 · ' + s.remainingInvestorSlots + ' cupos libres')
+          ),
+          h('div', { className: 'card stat-card' },
+            h('div', { className: 'stat-label' }, 'Fase 2'),
+            h('div', { className: 'stat-val', style: { fontSize: 18 } },
+              h('span', { className: 'badge ' + (s.phase2Active ? 'green' : 'amber') }, s.phase2Active ? '✓ ACTIVA' : '⏸ INACTIVA')
+            ),
+            h('div', { className: 'stat-delta muted' }, s.totalRedeemed + ' canjeados')
+          )
+        ),
+
+        /* Barra de progreso */
+        h('div', { className: 'card', style: { padding: '14px 16px' } },
+          h('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 } },
+            h('span', { style: { color: 'var(--txt-dim)' } }, 'Progreso de emisión'),
+            h('span', { style: { fontFamily: 'var(--mono)' } }, s.totalMinted + ' / 500 certificados')
+          ),
+          h('div', { style: { height: 8, background: 'var(--panel2)', borderRadius: 8, overflow: 'hidden' } },
+            h('div', { style: { height: '100%', width: pct(s.totalMinted, 500) + '%', background: 'var(--emerald)', borderRadius: 8, transition: 'width .6s' } })
+          ),
+          h('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--txt-mute)', marginTop: 6, fontFamily: 'var(--mono)' } },
+            h('span', {}, 'USD ' + s.capitalRaisedUSD.toLocaleString() + ' recaudados'),
+            h('span', {}, 'Target: USD 1,500,000')
+          )
+        ),
+
+        /* Links externos */
+        h('div', { style: { display: 'flex', gap: 8, marginTop: 12 } },
+          cfg && h('a', { href: explorerAddr(cfg.address) + '#tokentxns', target: '_blank', rel: 'noopener noreferrer', className: 'btn btn-ghost btn-sm' }, '↗ PolygonScan · Transacciones'),
+          cfg && h('a', { href: explorerAddr(cfg.address) + '#code', target: '_blank', rel: 'noopener noreferrer', className: 'btn btn-ghost btn-sm' }, '↗ Contrato verificado')
+        )
+      )
+    ),
+
+    /* Whitelist KYC */
+    tab === 'whitelist' && h('div', {},
+      h('div', { className: 'card', style: { marginBottom: 12, padding: '14px 16px' } },
+        h('div', { style: { fontWeight: 700, fontSize: 13, marginBottom: 10 } }, 'Agregar / remover inversor calificado'),
+        h('p', { style: { fontSize: 12, color: 'var(--txt-mute)', marginBottom: 12, lineHeight: 1.5 } }, 'Requiere rol COMPLIANCE_ROLE en el contrato. La tx se firma con MetaMask en Polygon PoS. El contador de inversores únicos nunca decrece.'),
+        h('div', { style: { display: 'flex', gap: 8, marginBottom: 8 } },
+          h('input', { type: 'text', placeholder: '0x… wallet del inversor calificado', value: wlAddr, onChange: function(e){ setWlAddr(e.target.value); },
+            style: { flex: 1, background: 'rgba(255,255,255,.03)', border: '1px solid ' + (isValidAddr(wlAddr) ? 'var(--emerald)' : 'rgba(255,255,255,.08)'), borderRadius: 8, padding: '8px 10px', color: 'var(--txt)', fontSize: 12, fontFamily: 'var(--mono)' } }),
+          h('button', { className: 'btn btn-primary btn-sm', onClick: doWhitelist, disabled: !isValidAddr(wlAddr) || txLoading }, txLoading ? '…' : '+ Whitelist'),
+          h('button', { className: 'btn btn-danger btn-sm', onClick: doRemove, disabled: !isValidAddr(wlAddr) || txLoading }, txLoading ? '…' : '− Remover')
+        )
+      ),
+      h('div', { className: 'card', style: { padding: '14px 16px' } },
+        h('div', { style: { fontWeight: 700, fontSize: 13, marginBottom: 10 } }, 'Verificar estado de un inversor'),
+        h('div', { style: { display: 'flex', gap: 8, marginBottom: 8 } },
+          h('input', { type: 'text', placeholder: '0x… wallet a verificar', value: checkAddr, onChange: function(e){ setCheckAddr(e.target.value); setCheckResult(null); },
+            style: { flex: 1, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 8, padding: '8px 10px', color: 'var(--txt)', fontSize: 12, fontFamily: 'var(--mono)' } }),
+          h('button', { className: 'btn btn-ghost btn-sm', onClick: doCheckInvestor, disabled: !isValidAddr(checkAddr) || txLoading }, 'Consultar on-chain')
+        ),
+        pg.investorInfo && h('div', { style: { marginTop: 8, padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,.03)', fontSize: 12 } },
+          h('div', { style: { display: 'flex', gap: 20 } },
+            h('span', {}, 'KYC on-chain: ', h('strong', { style: { color: pg.investorInfo.isQualified ? 'var(--emerald)' : 'var(--red)' } }, pg.investorInfo.isQualified ? '✓ HABILITADO' : '✗ NO HABILITADO')),
+            h('span', {}, 'Certificados: ', h('strong', {}, pg.investorInfo.balance))
+          )
+        )
+      )
+    ),
+
+    /* Emisión */
+    tab === 'mint' && h('div', {},
+      h('div', { className: 'card', style: { padding: '14px 16px' } },
+        h('div', { style: { fontWeight: 700, fontSize: 13, marginBottom: 6 } }, 'Emitir certificados PRE-GAT'),
+        h('p', { style: { fontSize: 12, color: 'var(--txt-mute)', marginBottom: 12, lineHeight: 1.5 } }, 'Requiere rol OPERATOR_ROLE. La wallet debe estar previamente en whitelist. Verificar pago acreditado y KYC aprobado antes de emitir.'),
+        h('div', { className: 'field' },
+          h('label', {}, 'Wallet del inversor (debe estar en whitelist)'),
+          h('input', { type: 'text', placeholder: '0x… wallet del inversor calificado', value: mintAddr, onChange: function(e){ setMintAddr(e.target.value); } })
+        ),
+        h('div', { className: 'field' },
+          h('label', {}, 'Cantidad de certificados'),
+          h('input', { type: 'number', min: 1, max: s ? s.remainingSupply : 500, value: mintQty, onChange: function(e){ setMintQty(Math.max(1, parseInt(e.target.value) || 1)); } })
+        ),
+        s && h('div', { style: { padding: '8px 12px', borderRadius: 8, background: 'rgba(0,214,126,.05)', border: '1px solid rgba(0,214,126,.15)', fontSize: 12, marginBottom: 12 } },
+          'Supply disponible: ', h('strong', {}, s.remainingSupply), ' certificados · USD ', h('strong', {}, (mintQty * 3000).toLocaleString()), ' por emitir'
+        ),
+        h('button', { className: 'btn btn-primary', onClick: doMint, disabled: !isValidAddr(mintAddr) || mintQty < 1 || txLoading || (s && mintQty > s.remainingSupply) },
+          txLoading ? h('span', { style: { display: 'flex', alignItems: 'center', gap: 8 } }, h('span', { className: 'spinner' }), 'Firmando con MetaMask…') : 'Emitir ' + mintQty + ' PRE-GAT → ' + (mintAddr ? mintAddr.slice(0,10)+'…' : 'wallet')
+        )
+      )
+    ),
+
+    /* Fase 2 */
+    tab === 'phase2' && h('div', {},
+      h('div', { className: 'card', style: { padding: '14px 16px', borderLeft: '3px solid ' + (s && s.phase2Active ? 'var(--emerald)' : 'var(--amber)') } },
+        h('div', { style: { fontWeight: 700, fontSize: 13, marginBottom: 6 } }, 'Control de Fase 2 — Canje PRE-GAT → GAT'),
+        h('p', { style: { fontSize: 12, color: 'var(--txt-mute)', marginBottom: 12, lineHeight: 1.5 } }, 'La Fase 2 permite a los inversores ejecutar redeem() y canjear su PRE-GAT por el GAT Token definitivo. Requiere DEFAULT_ADMIN_ROLE. Solo activar cuando CNV habilite RG 1069/2025 y el contrato GATToken.sol esté desplegado y auditado.'),
+        s && h('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 } },
+          h('span', { className: 'badge ' + (s.phase2Active ? 'green' : 'amber'), style: { fontSize: 12 } }, s.phase2Active ? '● FASE 2 ACTIVA' : '● FASE 2 INACTIVA'),
+          h('span', { style: { fontSize: 12, color: 'var(--txt-dim)' } }, s.totalRedeemed + ' canjeados hasta ahora')
+        ),
+        !s ? h('div', { style: { color: 'var(--txt-mute)', fontSize: 12 } }, 'Cargando estado…') :
+        h('div', {},
+          h('div', { style: { padding: '10px 12px', borderRadius: 8, background: 'rgba(255,178,62,.08)', border: '1px solid rgba(255,178,62,.2)', fontSize: 12, marginBottom: 12, lineHeight: 1.6 } },
+            h('strong', { style: { color: 'var(--amber)' } }, '⚠ Condiciones previas obligatorias:'), h('br'),
+            '1. Habilitación CNV bajo RG 1069/2025', h('br'),
+            '2. Fiduciario institucional del FF firmado y operativo', h('br'),
+            '3. GATToken.sol (ERC-3643) desplegado y auditado en Polygon PoS', h('br'),
+            '4. Backend indexador de CertificateRedeemed operativo', h('br'),
+            '5. Smoke test de canje en testnet exitoso'
+          ),
+          h('button', {
+            className: 'btn ' + (s.phase2Active ? 'btn-danger' : 'btn-primary'),
+            onClick: doTogglePhase2,
+            disabled: txLoading
+          }, txLoading ? h('span', { style: { display: 'flex', alignItems: 'center', gap: 8 } }, h('span', { className: 'spinner' }), 'Firmando…') :
+            s.phase2Active ? '⏸ Desactivar Fase 2' : '▶ Activar Fase 2 — Habilitar canje')
+        )
+      )
+    )
+  );
+}
+
+/* Tarjeta PRE-GAT live — estado global on-chain + wallet opcional */
+function PreGATLiveCard({ walletAddr, compact=false }) {
+  var pg = usePreGAT(walletAddr);
+  var cfg = pg.cfg;
+  var s = pg.status;
+  var info = pg.investorInfo;
+  if (!cfg) return null;
+
+  var explorerAddr = function(addr){ return cfg.explorer + '/address/' + addr; };
+  var explorerToken = cfg.explorer + '/token/' + cfg.address + (walletAddr ? '?a=' + walletAddr : '');
+
+  return h('div', { style: { marginBottom: compact ? 14 : 22 } },
+    h('div', { className: 'eyebrow', style: { marginBottom: 8 } }, 'Modo Real · PRE-GAT live'),
+    h('div', { className: 'card', style: { padding: compact ? '14px 16px' : 20, borderLeft: '3px solid var(--emerald)', background: 'rgba(0,214,126,.025)' } },
+      h('div', { className: 'between', style: { alignItems: 'flex-start', gap: 16, marginBottom: 14 } },
+        h('div', {},
+          h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 5 } },
+            h('h3', { style: { fontSize: compact ? 14 : 17, fontWeight: 800, margin: 0 } }, 'Certificados PRE-GAT · Grand Alyson'),
+            h('span', { className: 'badge green' }, 'POLYGON LIVE'),
+            h('span', { className: 'badge amber' }, 'SOULBOUND ERC-721')
+          ),
+          h('div', { style: { fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--txt-dim)' } },
+            cfg.address.slice(0,10) + '…' + cfg.address.slice(-6))
+        ),
+        h('div', { style: { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' } },
+          h('button', { className: 'btn btn-ghost btn-sm', onClick: pg.loadStatus, disabled: pg.loading }, pg.loading ? 'Actualizando…' : 'Actualizar'),
+          h('a', { href: explorerAddr(cfg.address), target: '_blank', rel: 'noopener noreferrer', className: 'btn btn-ghost btn-sm' }, 'PolygonScan')
+        )
+      ),
+      pg.error && h('div', { style: { color: 'var(--red)', fontSize: 12, marginBottom: 12 } }, pg.error),
+      s ? h('div', { className: 'grid', style: { gridTemplateColumns: compact ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 10, marginBottom: walletAddr ? 14 : 0 } },
+        h('div', { className: 'stat-card', style: { padding: 12, background: 'rgba(255,255,255,.025)', borderRadius: 8 } },
+          h('div', { className: 'stat-label' }, 'Emitidos'),
+          h('div', { className: 'stat-val emerald', style: { fontSize: 22 } }, s.totalMinted),
+          h('div', { className: 'stat-delta muted' }, s.remainingSupply + ' disponibles')),
+        h('div', { className: 'stat-card', style: { padding: 12, background: 'rgba(255,255,255,.025)', borderRadius: 8 } },
+          h('div', { className: 'stat-label' }, 'Inversores'),
+          h('div', { className: 'stat-val', style: { fontSize: 22 } }, s.totalInvestors),
+          h('div', { className: 'stat-delta muted' }, s.remainingInvestorSlots + ' cupos libres')),
+        h('div', { className: 'stat-card', style: { padding: 12, background: 'rgba(255,255,255,.025)', borderRadius: 8 } },
+          h('div', { className: 'stat-label' }, 'Capital'),
+          h('div', { className: 'stat-val', style: { fontSize: 22 } }, 'USD ' + s.capitalRaisedUSD.toLocaleString()),
+          h('div', { className: 'stat-delta muted' }, 'on-chain')),
+        h('div', { className: 'stat-card', style: { padding: 12, background: 'rgba(255,255,255,.025)', borderRadius: 8 } },
+          h('div', { className: 'stat-label' }, 'Fase 2'),
+          h('div', { className: 'stat-val', style: { fontSize: 17 } }, h('span', { className: 'badge ' + (s.phase2Active ? 'green' : 'amber') }, s.phase2Active ? 'ACTIVA' : 'INACTIVA')),
+          h('div', { className: 'stat-delta muted' }, s.totalRedeemed + ' canjeados'))
+      ) : h('div', { style: { color: 'var(--txt-mute)', fontSize: 13, padding: '12px 0' } }, pg.loading ? 'Leyendo Polygon PoS mainnet…' : 'Sin datos on-chain disponibles.'),
+      walletAddr && h('div', { style: { marginTop: 14, padding: '10px 12px', borderRadius: 8, background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.06)' } },
+        h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap', fontSize: 12 } },
+          h('div', {},
+            h('span', { style: { color: 'var(--txt-dim)' } }, 'Wallet consultada: '),
+            h('span', { className: 'mono' }, short(walletAddr))
+          ),
+          info ? h('div', { style: { display: 'flex', gap: 10, flexWrap: 'wrap' } },
+            h('span', { className: 'badge ' + (info.balance > 0 ? 'green' : 'gray') }, info.balance + ' certificado(s)'),
+            h('span', { className: 'badge ' + (info.isQualified ? 'green' : 'amber') }, info.isQualified ? 'KYC ON' : 'KYC OFF'),
+            h('a', { href: explorerToken, target: '_blank', rel: 'noopener noreferrer', style: { color: 'var(--emerald)', textDecoration: 'none', fontFamily: 'var(--mono)' } }, 'ver token')
+          ) : h('span', { style: { color: 'var(--txt-mute)' } }, 'Sin certificados en esta wallet')
+        )
+      )
+    )
+  );
+}
+
+/* Tarjeta PRE-GAT para inversores — muestra certificados on-chain */
+function PreGATInvestorCard({ walletAddr, toast }) {
+  var pg = usePreGAT(walletAddr);
+  var cfg = pg.cfg;
+  var info = pg.investorInfo;
+
+  if (!cfg) return null;
+  if (!walletAddr) return null;
+  if (!info || info.balance === 0) return null;
+
+  var explorerAddr = function(addr){ return cfg.explorer + '/address/' + addr; };
+  var explorerContract = cfg.explorer + '/token/' + cfg.address + '?a=' + walletAddr;
+
+  return h('div', { style: { marginTop: 20 } },
+    h('div', { className: 'eyebrow', style: { marginBottom: 8 } }, 'PRE-GAT · Polygon PoS Mainnet'),
+    h('div', { className: 'card', style: { padding: '14px 16px', borderLeft: '3px solid var(--emerald)', background: 'rgba(0,214,126,.02)' } },
+      h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } },
+        h('div', {},
+          h('div', { style: { fontWeight: 700, fontSize: 14, marginBottom: 4 } }, 'Certificados PRE-GAT · Grand Alyson'),
+          h('div', { style: { fontSize: 12, color: 'var(--txt-dim)', marginBottom: 8 } }, 'Fideicomiso Ordinario · San Martín, Mendoza · Soulbound ERC-721'),
+          h('div', { style: { display: 'flex', gap: 12, fontSize: 12, fontFamily: 'var(--mono)' } },
+            h('span', {}, h('strong', { style: { color: 'var(--emerald)' } }, info.balance), ' certificado(s)'),
+            h('span', { style: { color: 'var(--txt-mute)' } }, '·'),
+            h('span', {}, 'USD ', h('strong', {}, (info.balance * 3000).toLocaleString())),
+            h('span', { style: { color: 'var(--txt-mute)' } }, '·'),
+            h('span', { style: { color: info.isQualified ? 'var(--emerald)' : 'var(--amber)' } }, info.isQualified ? '✓ KYC habilitado' : '⚠ KYC removido'),
+            pg.status && h('span', { style: { color: 'var(--txt-mute)' } }, '·'),
+            pg.status && h('span', { style: { color: pg.status.phase2Active ? 'var(--emerald)' : 'var(--txt-mute)' } }, pg.status.phase2Active ? '▶ Canje disponible' : '⏸ Fase 2 pendiente')
+          )
+        ),
+        h('a', { href: explorerContract, target: '_blank', rel: 'noopener noreferrer', className: 'btn btn-ghost btn-sm', style: { flexShrink: 0 } }, '↗ PolygonScan')
+      )
+    )
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
    APP SHELL v3 — login dual · modo simple/experto · router
    ════════════════════════════════════════════════════════════════════ */
 function App(){
@@ -5669,16 +6264,29 @@ function App(){
   const [subView,setSubView] = useState('projects');
   const [walletIdx,setWalletIdx] = useState(1);
   const [sidebarOpen,setSidebarOpen] = useState(false);
+  const [liveMode,setLiveMode] = useState(function(){
+    if(typeof window === 'undefined' || window.__TOKAI_ENABLE_LIVE_MODE__ === false) return 'demo';
+    return localStorage.getItem('tokai_live_mode') || 'real';
+  });
 
   const apiUrl = window.__API_URL__ || '';
   const sim = useChain({apiUrl, loggedIn: !!auth});
   const web3 = (typeof useWeb3==='function') ? useWeb3() : { available:false };
   const live = (typeof useChainWeb3==='function') ? useChainWeb3(web3.account) : null;
-  const isLive = !!(web3.account && web3.chainOk && (typeof window!=='undefined') && window.__DEPLOYMENT__ && live);
+  const liveModeEnabled = (typeof window !== 'undefined') && window.__TOKAI_ENABLE_LIVE_MODE__ !== false;
+  const realRequested = liveModeEnabled && liveMode === 'real';
+  const isLive = !!(realRequested && web3.account && web3.chainOk && (typeof window!=='undefined') && window.__DEPLOYMENT__ && live);
+  const isReal = realRequested;
   const chain = isLive ? live : sim;
   const toast = useToast();
 
   const wallet = role==='investor' ? DEMO_WALLETS[walletIdx] : DEMO_WALLETS[0];
+  const liveWalletAddr = web3.account || (role==='investor' ? wallet.addr : null);
+  function setMode(nextMode){
+    if(!liveModeEnabled) return;
+    setLiveMode(nextMode);
+    try{ localStorage.setItem('tokai_live_mode', nextMode); }catch(e){}
+  }
 
   function go(v,pid,sub){
     let path = v;
@@ -5858,8 +6466,11 @@ function App(){
           h('div',{style:{display:'flex',alignItems:'center',gap:14}},
             h('button',{className:'menu-btn',onClick:()=>setSidebarOpen(true)},h(Icon,{d:'M3 12h18M3 6h18M3 18h18',style:{width:18,height:18}})),
             h('span',{className:'topbar-title'},simpleTitles[view]||'TOKAI'),
-            h('span',{className:'badge '+(isLive?'green':'gray'),style:{fontSize:9,marginLeft:4}},isLive?'● EN VIVO':'DEMO')),
+            h('span',{className:'badge '+(isReal?'green':'gray'),style:{fontSize:9,marginLeft:4}},isReal?(isLive?'● REAL WEB3':'● REAL PRE-GAT'):'DEMO')),
           h('div',{className:'topbar-right'},
+            liveModeEnabled&&h('div',{className:'role-switch'},
+              h('button',{className:'role-btn'+(!isReal?' active':''),onClick:()=>setMode('demo')},'Demo'),
+              h('button',{className:'role-btn'+(isReal?' active':''),onClick:()=>setMode('real')},'Real')),
             h('div',{className:'role-switch'},
               h('button',{className:'role-btn active',onClick:()=>switchMode('simple')},'Simple'),
               h('button',{className:'role-btn',onClick:()=>switchMode('expert')},'Experto')),
@@ -5873,7 +6484,7 @@ function App(){
           view==='asset'&&h(AssetDetail,{chain,wallet,pid:activeProject==null?0:activeProject,toast,go}),
           view==='guide'&&h(GuideView,{chain,role:'issuer',go,setRole:activateRole}),
           view==='thesis-client'&&h(ThesisClientView,{chain,toast}),
-          view==='dash'&&h(Dashboard,{chain,go}),
+          view==='dash'&&h(Dashboard,{chain,go,liveMode,liveWalletAddr}),
           view==='market'&&h(MarketView,{chain,wallet,toast,initialPid:activeProject})
         ),
         // botón flotante del asistente: emisor en modo simple
@@ -5968,8 +6579,11 @@ function App(){
         h('div',{style:{display:'flex',alignItems:'center',gap:14}},
           h('button',{className:'menu-btn',onClick:()=>setSidebarOpen(true)},h(Icon,{d:'M3 12h18M3 6h18M3 18h18',style:{width:18,height:18}})),
           h('span',{className:'topbar-title'},titles[view]),
-          h('span',{className:'badge '+(isLive?'green':'gray'),style:{fontSize:9,marginLeft:4}},isLive?'● EN VIVO':'DEMO')),
+          h('span',{className:'badge '+(isReal?'green':'gray'),style:{fontSize:9,marginLeft:4}},isReal?(isLive?'● REAL WEB3':'● REAL PRE-GAT'):'DEMO')),
         h('div',{className:'topbar-right'},
+          liveModeEnabled&&h('div',{className:'role-switch'},
+            h('button',{className:'role-btn'+(!isReal?' active':''),onClick:()=>setMode('demo')},'Demo'),
+            h('button',{className:'role-btn'+(isReal?' active':''),onClick:()=>setMode('real')},'Real')),
           role==='issuer'&&h('div',{className:'role-switch'},
             h('button',{className:'role-btn',onClick:()=>switchMode('simple')},'Simple'),
             h('button',{className:'role-btn active',onClick:()=>switchMode('expert')},'Experto')),
@@ -5987,12 +6601,12 @@ function App(){
             web3.connecting?'Conectando…':web3.account?(web3.chainOk?'● '+short(web3.account):'⚠ Red incorrecta'):'Conectar wallet'))
       ),
       h('div',{className:'content'},
-        view==='dash'&&h(Dashboard,{chain,go}),
+        view==='dash'&&h(Dashboard,{chain,go,liveMode,liveWalletAddr}),
         view==='asset'&&h(AssetDetail,{chain,wallet,pid:activeProject==null?0:activeProject,toast,go}),
         view==='invest'&&h(InvestView,{chain,wallet,projectId:activeProject,toast}),
         // botón flotante inversor en modo experto cuando está en portal inversor
         view==='invest'&&h(InvestorAssistantFloat,{project:(chain.projects||[])[activeProject||0],chain}),
-        view==='portfolio'&&h(PortfolioView,{chain,wallet,toast,go}),
+        view==='portfolio'&&h(PortfolioView,{chain,wallet,toast,go,liveMode,liveWalletAddr}),
         view==='market'&&h(MarketView,{chain,wallet,toast,initialPid:activeProject}),
         view==='tokai'&&canAccessRole('tokai')&&h(TokaiView,{chain,toast,subView,go}),
         view==='admin'&&canAccessRole('issuer')&&h(AdminView,{chain,wallet,toast,subView}),
