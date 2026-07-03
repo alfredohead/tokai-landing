@@ -5676,6 +5676,32 @@ function App(){
     setSidebarOpen(false);
   }
 
+  function canAccessRole(targetRole){
+    if(targetRole==='investor') return true;
+    if(!auth) return false;
+    if(auth.isAdmin || auth.role==='tokai') return true;
+    if(auth.method==='wallet') return false;
+    if(targetRole==='issuer') return auth.role==='issuer' && (auth.approved || paid);
+    return false;
+  }
+
+  function denyRole(targetRole){
+    const label = targetRole==='tokai' ? 'TOKAI' : targetRole==='issuer' ? 'Emisor' : 'Inversor';
+    toast&&toast({type:'warn',title:'Acceso restringido',msg:'La wallet demo solo habilita el perfil Inversor. El perfil '+label+' requiere una cuenta aprobada.'});
+    setRole('investor');
+    setUiMode('expert');
+    go('dash');
+  }
+
+  function activateRole(targetRole){
+    if(!canAccessRole(targetRole)){
+      denyRole(targetRole);
+      return false;
+    }
+    setRole(targetRole);
+    return true;
+  }
+
   /* Efecto para sincronizar el estado de React con el Hash de la URL */
   useEffect(() => {
     function handleHashChange() {
@@ -5689,6 +5715,11 @@ function App(){
       }
       const parts = hash.split('/');
       const v = parts[0];
+
+      if((v==='tokai' && !canAccessRole('tokai')) || (v==='admin' && !canAccessRole('issuer'))){
+        denyRole(v==='tokai'?'tokai':'issuer');
+        return;
+      }
       
       let pid = null;
       let sub = null;
@@ -5713,7 +5744,7 @@ function App(){
     handleHashChange(); // Sincronización inicial
 
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [role, uiMode]);
+  }, [role, uiMode, auth, paid]);
 
   /* Guarda de redirección según el rol de experto */
   useEffect(()=>{
@@ -5731,6 +5762,10 @@ function App(){
   function switchMode(m){
     setUiMode(m);
     if(m==='simple'){
+      if(!canAccessRole('issuer')){
+        denyRole('issuer');
+        return;
+      }
       setRole('issuer');
       go('home');
     } else {
@@ -5824,7 +5859,7 @@ function App(){
           view==='wizard'&&h(WizardCrear,{chain,toast,go}),
           view==='admin'&&h(AdminView,{chain,wallet,toast}),
           view==='asset'&&h(AssetDetail,{chain,wallet,pid:activeProject==null?0:activeProject,toast,go}),
-          view==='guide'&&h(GuideView,{chain,role:'issuer',go,setRole}),
+          view==='guide'&&h(GuideView,{chain,role:'issuer',go,setRole:activateRole}),
           view==='thesis-client'&&h(ThesisClientView,{chain,toast}),
           view==='dash'&&h(Dashboard,{chain,go}),
           view==='market'&&h(MarketView,{chain,wallet,toast,initialPid:activeProject})
@@ -5873,7 +5908,7 @@ function App(){
     sidebarOpen&&h('div',{onClick:()=>setSidebarOpen(false),style:{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:80}}),
     h('div',{className:'main'},
       (function(){
-        const esSimulacionInversor = auth && (auth.isAdmin || auth.approved) && role === 'investor';
+        const esSimulacionInversor = auth && (auth.isAdmin || (auth.approved && auth.method!=='wallet')) && role === 'investor';
         if (!esSimulacionInversor) return null;
         return h('div', {
           style: {
@@ -5894,11 +5929,10 @@ function App(){
           h('button', {
             onClick: () => {
               if (auth.isAdmin) {
-                setRole('tokai');
+                activateRole('tokai');
                 go('tokai');
               } else {
-                setRole('issuer');
-                switchMode('simple');
+                if(activateRole('issuer')) switchMode('simple');
               }
             },
             className: 'btn btn-primary btn-sm',
@@ -5928,9 +5962,9 @@ function App(){
             h('button',{className:'role-btn',onClick:()=>switchMode('simple')},'Simple'),
             h('button',{className:'role-btn active',onClick:()=>switchMode('expert')},'Experto')),
           h('div',{className:'role-switch'},
-            h('button',{className:'role-btn'+(role==='investor'?' active':''),onClick:()=>setRole('investor')},'Inversor'),
-            h('button',{className:'role-btn'+(role==='issuer'?' active':''),onClick:()=>setRole('issuer')},'Emisor'),
-            h('button',{className:'role-btn'+(role==='tokai'?' active':''),onClick:()=>setRole('tokai')},'TOKAI')),
+            h('button',{className:'role-btn'+(role==='investor'?' active':''),onClick:()=>activateRole('investor')},'Inversor'),
+            canAccessRole('issuer')&&h('button',{className:'role-btn'+(role==='issuer'?' active':''),onClick:()=>activateRole('issuer')},'Emisor'),
+            canAccessRole('tokai')&&h('button',{className:'role-btn'+(role==='tokai'?' active':''),onClick:()=>activateRole('tokai')},'TOKAI')),
           role==='investor'&&h('select',{value:walletIdx,onChange:e=>setWalletIdx(+e.target.value),
             style:{background:'var(--panel)',border:'1px solid var(--line-solid)',borderRadius:9,padding:'7px 10px',color:'var(--txt)',fontSize:12,maxWidth:170}},
             DEMO_WALLETS.map((w,i)=>w.role!=='admin'&&h('option',{key:i,value:i},w.label))),
@@ -5948,9 +5982,9 @@ function App(){
         view==='invest'&&h(InvestorAssistantFloat,{project:(chain.projects||[])[activeProject||0],chain}),
         view==='portfolio'&&h(PortfolioView,{chain,wallet,toast,go}),
         view==='market'&&h(MarketView,{chain,wallet,toast,initialPid:activeProject}),
-        view==='tokai'&&h(TokaiView,{chain,toast,subView,go}),
-        view==='admin'&&h(AdminView,{chain,wallet,toast,subView}),
-        view==='guide'&&h(GuideView,{chain,role,go,setRole}),
+        view==='tokai'&&canAccessRole('tokai')&&h(TokaiView,{chain,toast,subView,go}),
+        view==='admin'&&canAccessRole('issuer')&&h(AdminView,{chain,wallet,toast,subView}),
+        view==='guide'&&h(GuideView,{chain,role,go,setRole:activateRole}),
         view==='thesis-editor'&&h(ThesisFlexEditor,{chain,toast,go}),
         view==='thesis-client'&&h(ThesisClientView,{chain,toast}),
         view==='emission-engine'&&h(EmissionPreview,{chain,toast}),
