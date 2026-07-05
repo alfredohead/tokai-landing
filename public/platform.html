@@ -1263,7 +1263,17 @@ function useChainWeb3(account){
             method: 'PATCH',
             headers: { 'Content-Type':'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ tokenAddress: tokenAddr, tokenDeployed: true, ronda: 6 }),
+            body: JSON.stringify({
+              tokenAddress: tokenAddr,
+              tokenDeployed: true,
+              tokenDeployTxHash: tx.hash,
+              tokenFactoryAddress: dep.tokenFactory,
+              tokenDeployEvent: 'ProjectDeployed',
+              tokenDeployNetwork: dep.network || 'polygon',
+              tokenDeployChainId: dep.chainId,
+              tokenDeployBlockNumber: receipt.blockNumber,
+              ronda: 6
+            }),
           });
           if (!patchRes.ok) {
             // Token desplegado on-chain pero no persistido — reportar al usuario
