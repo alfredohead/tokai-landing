@@ -1603,14 +1603,15 @@ function InvestView({chain,wallet,projectId,toast}){
     );
   }
 
-  const [pid,setPid]=useState(projectId??0);
+  const [pid,setPid]=useState(projectId!=null?projectId:(chain.projects[0]?chain.projects[0].id:0));
   const [step,setStep]=useState(0); // 0 select, 1 kyc, 2 fund, 3 buy, 4 done
   const [amount,setAmount]=useState(1);
   const gate=useGate();
-  const p=chain.projects.find(x=>x.id===pid);
+  const p=chain.projects.find(x=>String(x.id)===String(pid))||chain.projects[0]||{symbol:'—',regime:'—',jurisdictions:[],priceUsdCents:0};
+  const rpid=p.id;
   const id=chain.identities[wallet.addr];
   const verified=id&&id.verified;
-  const myBal=chain.bal(pid,wallet.addr);
+  const myBal=chain.bal(rpid,wallet.addr);
 
   useEffect(()=>{ if(projectId!=null) setPid(projectId); },[projectId]);
 
@@ -1630,10 +1631,10 @@ function InvestView({chain,wallet,projectId,toast}){
     setStep(2);
   }
   function doBuy(){
-    const checks=chain.canTransfer(pid,null,wallet.addr,amount).checks;
+    const checks=chain.canTransfer(rpid,null,wallet.addr,amount).checks;
     gate.run(checks,(ok)=>{
       if(ok){
-        const r=chain.mint(pid,wallet.addr,amount);
+        const r=chain.mint(rpid,wallet.addr,amount);
         if(r.ok){toast({title:'Suscripción exitosa',msg:`${amount} ${p.symbol} emitidos a tu wallet`,hash:txHash()});setStep(4);}
       } else {
         toast({type:'err',title:'Suscripción bloqueada',msg:'El contrato rechazó la operación por compliance'});
@@ -1658,8 +1659,8 @@ function InvestView({chain,wallet,projectId,toast}){
         step===0&&h('div',{className:'card'},
           h('h3',{style:{fontSize:15,fontWeight:700,marginBottom:14}},'Elegí un proyecto'),
           h('div',{className:'field'},h('label',{},'Proyecto'),
-            h('select',{value:pid,onChange:e=>setPid(+e.target.value)},
-              chain.projects.map(x=>h('option',{key:x.id,value:x.id},`${x.name} (${x.symbol})`)))),
+            h('select',{value:String(pid),onChange:e=>setPid(e.target.value)},
+              chain.projects.map(x=>h('option',{key:x.id,value:String(x.id)},`${x.name} (${x.symbol})`)))),
           h('div',{style:{marginTop:8}},
             h('div',{className:'kv'},h('span',{className:'k'},'Régimen'),h('span',{className:'v'},p.regime)),
             h('div',{className:'kv'},h('span',{className:'k'},'Precio por token'),h('span',{className:'v'},p.priceUsdCents?fmtUsd(p.priceUsdCents):'—')),
@@ -1937,26 +1938,28 @@ function AdminProjects({chain,toast}){
 }
 
 function AdminMint({chain,toast}){
-  const [pid,setPid]=useState(0);
+  const [pid,setPid]=useState(chain.projects[0]?chain.projects[0].id:0);
   const [target,setTarget]=useState(DEMO_WALLETS[1].addr);
   const [amount,setAmount]=useState(10);
   const gate=useGate();
-  const p=chain.projects.find(x=>x.id===pid);
+  /* Comparación por String: los proyectos reales usan UUID, los demo id numérico */
+  const p=chain.projects.find(x=>String(x.id)===String(pid))||chain.projects[0]||{symbol:'—',id:pid};
+  const rpid=p.id;
   function ensureKyc(addr){ const w=DEMO_WALLETS.find(x=>x.addr===addr); if(w&&w.role!=='admin'&&!chain.identities[addr]) chain.registerIdentity(addr,w.jur,w.cat); }
   function mint(){
     const w=DEMO_WALLETS.find(x=>x.addr===target);
     // pre-register kyc if demo wallet has it (except the no-kyc one)
     if(w&&w.label.includes('sin KYC')){} else ensureKyc(target);
-    const checks=chain.canTransfer(pid,null,target,amount).checks;
+    const checks=chain.canTransfer(rpid,null,target,amount).checks;
     gate.run(checks,(ok)=>{
-      if(ok){const r=chain.mint(pid,target,amount);if(r.ok)toast({title:'Emisión ejecutada',msg:`${amount} ${p.symbol} → ${short(target)}`,hash:txHash()});}
+      if(ok){const r=chain.mint(rpid,target,amount);if(r.ok)toast({title:'Emisión ejecutada',msg:`${amount} ${p.symbol} → ${short(target)}`,hash:txHash()});}
       else toast({type:'err',title:'Emisión bloqueada',msg:'Compliance rechazó al destinatario'});
     });
   }
   return h('div',{className:'row'},
     h('div',{style:{flex:'1 1 55%'}},h('div',{className:'card'},
       h('h3',{style:{fontSize:15,fontWeight:700,marginBottom:14}},'Emisión primaria (mint)'),
-      h('div',{className:'field'},h('label',{},'Proyecto'),h('select',{value:pid,onChange:e=>setPid(+e.target.value)},chain.projects.map(x=>h('option',{key:x.id,value:x.id},x.name)))),
+      h('div',{className:'field'},h('label',{},'Proyecto'),h('select',{value:String(pid),onChange:e=>setPid(e.target.value)},chain.projects.map(x=>h('option',{key:x.id,value:String(x.id)},x.name)))),
       h('div',{className:'field'},h('label',{},'Wallet destino'),h('select',{value:target,onChange:e=>setTarget(e.target.value)},DEMO_WALLETS.filter(w=>w.role!=='admin').map(w=>h('option',{key:w.addr,value:w.addr},w.label)))),
       h('div',{className:'field'},h('label',{},'Cantidad'),h('input',{type:'number',min:1,value:amount,onChange:e=>setAmount(+e.target.value)})),
       h('button',{className:'btn btn-primary',style:{width:'100%'},disabled:gate.running,onClick:mint},gate.running?'Verificando…':'Emitir tokens'),
@@ -1967,20 +1970,21 @@ function AdminMint({chain,toast}){
 }
 
 function AdminYield({chain,toast}){
-  const [pid,setPid]=useState(0);
+  const [pid,setPid]=useState(chain.projects[0]?chain.projects[0].id:0);
   const [amount,setAmount]=useState(50000);
-  const p=chain.projects.find(x=>x.id===pid);
-  const yp=chain.yieldPool[pid];
+  const p=chain.projects.find(x=>String(x.id)===String(pid))||chain.projects[0]||{symbol:'—',totalSupply:0,id:pid};
+  const rpid=p.id;
+  const yp=chain.yieldPool[rpid];
   function dist(){
     if(p.totalSupply===0){toast({type:'err',title:'Sin holders',msg:'No hay tokens emitidos en este proyecto'});return;}
-    const r=chain.distributeYield(pid,amount);
+    const r=chain.distributeYield(rpid,amount);
     if(r.ok)toast({title:'Yield distribuido',msg:`USD ${fmt(amount)} repartidos pro-rata entre ${p.totalSupply} tokens`,hash:txHash()});
   }
-  const holders=Object.keys(chain.balances).filter(k=>k.startsWith(pid+':')&&chain.balances[k]>0).map(k=>k.split(':')[1]);
+  const holders=Object.keys(chain.balances).filter(k=>k.startsWith(rpid+':')&&chain.balances[k]>0).map(k=>k.split(':')[1]);
   return h('div',{className:'row'},
     h('div',{style:{flex:'1 1 50%'}},h('div',{className:'card'},
       h('h3',{style:{fontSize:15,fontWeight:700,marginBottom:14}},'Distribución de yield'),
-      h('div',{className:'field'},h('label',{},'Proyecto'),h('select',{value:pid,onChange:e=>setPid(+e.target.value)},chain.projects.map(x=>h('option',{key:x.id,value:x.id},x.name)))),
+      h('div',{className:'field'},h('label',{},'Proyecto'),h('select',{value:String(pid),onChange:e=>setPid(e.target.value)},chain.projects.map(x=>h('option',{key:x.id,value:String(x.id)},x.name)))),
       h('div',{className:'field'},h('label',{},'Monto total a distribuir (USD)'),h('input',{type:'number',value:amount,onChange:e=>setAmount(+e.target.value)}),
         h('div',{className:'hint'},p.totalSupply?'≈ USD '+fmt(amount/p.totalSupply)+' por token · '+p.totalSupply+' tokens':'sin holders')),
       h('button',{className:'btn btn-primary',style:{width:'100%'},onClick:dist},'Distribuir pro-rata'),
@@ -1990,7 +1994,7 @@ function AdminYield({chain,toast}){
       h('div',{className:'gate-title',style:{marginBottom:14}},h(Icon,{d:I.users,style:{width:14,height:14}}),'Holders · '+p.symbol),
       holders.length===0?h('div',{className:'empty'},h(Icon,{d:I.users}),h('div',{},'Sin holders todavía')):
       holders.map(a=>h('div',{key:a,className:'kv'},h('span',{className:'k mono'},short(a)),
-        h('span',{className:'v'},chain.bal(pid,a)+' '+p.symbol+' · ',h('span',{style:{color:'var(--emerald)'}},'USD '+fmt(chain.claimableYield(pid,a))))))
+        h('span',{className:'v'},chain.bal(rpid,a)+' '+p.symbol+' · ',h('span',{style:{color:'var(--emerald)'}},'USD '+fmt(chain.claimableYield(rpid,a))))))
     ))
   );
 }
@@ -2017,9 +2021,10 @@ function MarketView({chain,wallet,toast,initialPid}){
   const [amount,setAmount]=useState(1);
   const [price,setPrice]=useState(3100);
   const gate=useGate();
-  const p=chain.projects.find(x=>x.id===pid)||chain.projects[0]||{soulbound:false,symbol:'—',id:0,jurisdictions:[]};
-  const myBal=chain.bal(pid,wallet.addr);
-  const openOrders=chain.orders.filter(o=>o.active&&o.pid===pid);
+  const p=chain.projects.find(x=>String(x.id)===String(pid))||chain.projects[0]||{soulbound:false,symbol:'—',id:0,jurisdictions:[]};
+  const rpid=p.id;
+  const myBal=chain.bal(rpid,wallet.addr);
+  const openOrders=chain.orders.filter(o=>o.active&&o.pid===rpid);
 
   /* Historial simulado de transacciones ejecutadas */
   const [tradeHistory,setTradeHistory]=useState([
@@ -2027,11 +2032,11 @@ function MarketView({chain,wallet,toast,initialPid}){
     {id:2,pid:0,buyer:'0xC7d8E9f0A1b2C7d8E9f0A1b2C7d8E9f0A1b2C7d8',seller:'0xD0e1F2a3B4c5D0e1F2a3B4c5D0e1F2a3B4c5D0e1',amount:5,price:3150,ts:Date.now()-86400000},
     {id:3,pid:1,buyer:'0xE3f4A5b6C7d8E3f4A5b6C7d8E3f4A5b6C7d8E3f4',seller:'0xF6a7B8c9D0e1F6a7B8c9D0e1F6a7B8c9D0e1F6a7',amount:2,price:450,ts:Date.now()-3600000*5},
   ]);
-  const historial=tradeHistory.filter(t=>t.pid===pid);
+  const historial=tradeHistory.filter(t=>String(t.pid)===String(rpid));
 
   function create(){
     if(p.soulbound){toast({type:'err',title:'Token soulbound',msg:'Este proyecto no admite mercado secundario por diseño'});return;}
-    const r=chain.createOrder(pid,wallet.addr,amount,price);
+    const r=chain.createOrder(rpid,wallet.addr,amount,price);
     if(r.ok)toast({title:'Orden publicada',msg:`${amount} ${p.symbol} @ USD ${fmt(price)}`,hash:txHash()});
     else toast({type:'err',title:'No se pudo publicar',msg:r.reason});
   }
@@ -2052,7 +2057,7 @@ function MarketView({chain,wallet,toast,initialPid}){
     h('div',{className:'eyebrow'},'Mercado secundario permisionado'),
     h('h1',{className:'page'},'Mercado OTC'),
     h('p',{className:'page-sub'},'Order book permisionado — sin AMM, sin slippage, sin impermanent loss. Cada operación pasa por el contrato del token, que re-valida KYC, jurisdicción y lock-up. Compatible con RG 1069/1088: "impedir transferencias no permitidas".'),
-    h('div',{className:'field',style:{maxWidth:340}},h('label',{},'Proyecto'),h('select',{value:pid,onChange:e=>{setPid(+e.target.value);gate.reset();}},chain.projects.map(x=>h('option',{key:x.id,value:x.id},`${x.name} (${x.symbol})`)))),
+    h('div',{className:'field',style:{maxWidth:340}},h('label',{},'Proyecto'),h('select',{value:String(pid),onChange:e=>{setPid(e.target.value);gate.reset();}},chain.projects.map(x=>h('option',{key:x.id,value:String(x.id)},`${x.name} (${x.symbol})`)))),
     p.soulbound&&h('div',{className:'card',style:{borderColor:'rgba(255,178,62,.3)',marginBottom:16}},
       h('div',{style:{display:'flex',gap:11,alignItems:'center'}},h(Icon,{d:I.lock,style:{width:18,height:18,color:'var(--amber)'}}),
         h('div',{},h('b',{style:{color:'var(--amber)'}},'Token soulbound'),h('div',{className:'muted',style:{fontSize:12.5}},'Este proyecto está diseñado como ecosistema cerrado (Howey-safe). No tiene mercado secundario — los certificados son intransferibles.')))),
@@ -2253,7 +2258,7 @@ function AdminPitch({chain, toast}){
    proyección económica, simulador. Pero con honestidad de liquidez
    (mercado permisionado) y el régimen regulatorio al frente.          */
 function AssetDetail({chain,wallet,pid,toast,go}){
-  const _raw = chain.projects.find(x=>x.id===pid) || chain.projects[0] || {};
+  const _raw = chain.projects.find(x=>String(x.id)===String(pid)) || chain.projects[0] || {};
   // normalización defensiva: en modo live los proyectos vienen de la cadena sin
   // metadata de ficha. Rellenamos con defaults seguros para no romper el render.
   const p = Object.assign({
@@ -7418,11 +7423,13 @@ function App(){
 
       let pid = null;
       let sub = null;
-      
+
       if (['admin', 'tokai'].includes(v)) {
         sub = parts[1] || (v === 'admin' ? 'projects' : 'dashboard');
       } else {
-        pid = parts[1] != null && parts[1] !== '' ? Number(parts[1]) : null;
+        /* Los proyectos reales usan UUID: solo castear a Number los ids demo numéricos */
+        const rawPid = parts[1];
+        pid = rawPid != null && rawPid !== '' ? (/^\d+$/.test(rawPid) ? Number(rawPid) : rawPid) : null;
         sub = parts[2] || null;
       }
 
@@ -7572,7 +7579,7 @@ function App(){
   const nav = {
     investor:[['dash','Proyectos',I.proj],['portfolio','Mi cartera',I.wallet],['invest','Suscribir',I.invest],['market','Mercado secundario',I.market],['guide','Guía de uso',I.doc]],
     issuer:[['dash','Proyectos',I.proj],['admin','Administración',I.admin],['market','Mercado secundario',I.market],['guide','Guía de uso',I.doc]],
-    tokai:[['tokai','Supervisión',I.flask],['report-gen','Reporte Modelo',I.doc],['emission-engine','Motor de Emisión',I.zap],['emission-checklist','Checklist',I.shield],['thesis-editor','Tesis de Valor',I.doc],['dash','Proyectos',I.proj],['market','Mercado secundario',I.market],['guide','Guía de uso',I.doc]],
+    tokai:[['tokai','Supervisión',I.flask],['report-gen','Reporte Modelo',I.doc],['emission-engine','Motor de Emisión',I.zap],['emission-checklist','Checklist',I.shield],['admin','Emisión · PRE-GAT',I.zap],['thesis-editor','Tesis de Valor',I.doc],['dash','Proyectos',I.proj],['market','Mercado secundario',I.market],['guide','Guía de uso',I.doc]],
   }[role];
   const titles={dash:'Proyectos',asset:'Ficha del activo',invest:'Portal del inversor',portfolio:'Mi cartera',market:'Mercado secundario',tokai:'Panel TOKAI',admin:'Administración',guide:'Guía de uso','thesis-editor':'Tesis de Valor · TOKAI','thesis-client':'Tesis de Valor · Cliente','emission-engine':'Motor de Emisión','emission-checklist':'Checklist pre-emisión','report-gen':'Reporte del modelo'};
 
