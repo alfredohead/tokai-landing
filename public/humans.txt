@@ -1,0 +1,18 @@
+/* TEAM */
+
+Organization: TOKAI RWA
+Contact: tokairwa@gmail.com
+Site: https://tokairwa.com/
+Location: Argentina / LATAM
+
+/* SITE */
+
+Language: Spanish (Argentina)
+Canonical URL: https://tokairwa.com/
+Sitemap: https://tokairwa.com/sitemap.xml
+Robots: https://tokairwa.com/robots.txt
+Topic: Real-world asset tokenization, compliance, security tokens and on-chain architecture.
+
+/* NOTICE */
+
+TOKAI RWA publishes educational and institutional content. It does not provide legal, financial or tax advice through the public website.

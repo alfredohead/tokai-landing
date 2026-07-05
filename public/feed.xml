@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>TOKAI RWA - Guias de tokenizacion</title>
+    <link>https://tokairwa.com/guias/</link>
+    <description>Contenido educativo de TOKAI RWA sobre tokenizacion de activos reales, compliance, security tokens, ERC-3643 y oportunidades en Argentina y LATAM.</description>
+    <language>es-AR</language>
+    <lastBuildDate>Sun, 05 Jul 2026 00:00:00 +0000</lastBuildDate>
+    <atom:link href="https://tokairwa.com/feed.xml" rel="self" type="application/rss+xml"/>
+    <item>
+      <title>Tokenizacion de activos reales: guia para emisores</title>
+      <link>https://tokairwa.com/tokenizacion-activos-reales/</link>
+      <guid isPermaLink="true">https://tokairwa.com/tokenizacion-activos-reales/</guid>
+      <description>Que es la tokenizacion de activos reales, que problemas resuelve y que debe validar un emisor antes de lanzar un proyecto RWA.</description>
+      <pubDate>Thu, 02 Jul 2026 00:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>RWA en Argentina: tokenizacion, compliance y emisores</title>
+      <link>https://tokairwa.com/rwa-argentina/</link>
+      <guid isPermaLink="true">https://tokairwa.com/rwa-argentina/</guid>
+      <description>Contexto regulatorio, oportunidades y criterios para estructurar emisiones tokenizadas en Argentina.</description>
+      <pubDate>Thu, 02 Jul 2026 00:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Security tokens: que son y como se estructuran</title>
+      <link>https://tokairwa.com/security-tokens/</link>
+      <guid isPermaLink="true">https://tokairwa.com/security-tokens/</guid>
+      <description>Instrumentos financieros tokenizados, compliance, derechos economicos y reglas on-chain.</description>
+      <pubDate>Thu, 02 Jul 2026 00:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Tokenizacion inmobiliaria: fideicomisos, rentas y reporting</title>
+      <link>https://tokairwa.com/tokenizacion-inmobiliaria/</link>
+      <guid isPermaLink="true">https://tokairwa.com/tokenizacion-inmobiliaria/</guid>
+      <description>Como pensar tokenizacion inmobiliaria con vehiculo legal, modelo economico, rentas y trazabilidad.</description>
+      <pubDate>Thu, 02 Jul 2026 00:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>ERC-3643 para security tokens y RWA</title>
+      <link>https://tokairwa.com/erc-3643/</link>
+      <guid isPermaLink="true">https://tokairwa.com/erc-3643/</guid>
+      <description>Identidad, elegibilidad, whitelists y restricciones de transferencia para tokens regulados.</description>
+      <pubDate>Thu, 02 Jul 2026 00:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Compliance RWA: KYC, AML y transferencias permitidas</title>
+      <link>https://tokairwa.com/compliance-rwa/</link>
+      <guid isPermaLink="true">https://tokairwa.com/compliance-rwa/</guid>
+      <description>Capas de compliance para proyectos RWA: identidad, origen de fondos, jurisdicciones, monitoreo y auditoria.</description>
+      <pubDate>Thu, 02 Jul 2026 00:00:00 +0000</pubDate>
+    </item>
+    <item>
+      <title>Tokenizacion RWA en LATAM: estrategia regional</title>
+      <link>https://tokairwa.com/tokenizacion-latam/</link>
+      <guid isPermaLink="true">https://tokairwa.com/tokenizacion-latam/</guid>
+      <description>Como disenar proyectos RWA para operar con criterios regionales sin perder precision jurisdiccional.</description>
+      <pubDate>Thu, 02 Jul 2026 00:00:00 +0000</pubDate>
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,42 @@
+# TOKAI RWA
+
+> TOKAI RWA is a LATAM-focused laboratory for structuring and tokenizing real-world assets with financial, legal, compliance and on-chain architecture rigor.
+
+## Primary URL
+
+https://tokairwa.com/
+
+## What TOKAI RWA Does
+
+TOKAI RWA designs, evaluates and structures real-world asset tokenization projects for issuers, sponsors and companies in Argentina and LATAM. The work covers financial structuring, legal and regulatory analysis, KYC/AML compliance, smart contract architecture, token standards, investor materials and post-issuance monitoring.
+
+## Core Topics
+
+- Real-world asset tokenization
+- RWA structuring in Argentina and LATAM
+- Security tokens and STO design
+- Tokenized real estate
+- ERC-3643 and permissioned token transfers
+- Compliance for tokenized assets
+- KYC, AML, whitelist and transfer restrictions
+- Smart contract architecture for asset-backed instruments
+
+## Important Public Pages
+
+- Homepage: https://tokairwa.com/
+- Guide library: https://tokairwa.com/guias/
+- Real-world asset tokenization: https://tokairwa.com/tokenizacion-activos-reales/
+- RWA in Argentina: https://tokairwa.com/rwa-argentina/
+- Security tokens: https://tokairwa.com/security-tokens/
+- Tokenized real estate: https://tokairwa.com/tokenizacion-inmobiliaria/
+- ERC-3643: https://tokairwa.com/erc-3643/
+- Compliance RWA: https://tokairwa.com/compliance-rwa/
+- Tokenization in LATAM: https://tokairwa.com/tokenizacion-latam/
+
+## Contact
+
+tokairwa@gmail.com
+
+## Notes
+
+The content is educational and institutional. It is not legal, financial or tax advice.
