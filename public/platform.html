@@ -2712,6 +2712,72 @@ function AdminGeofencing({chain, toast}){
 /* El cuarto rol que NINGÚN competidor tiene. TOKAI estructura y supervisa
    SIN custodiar ni ser PSAV. Pipeline de 6 rondas + compliance agregado.  */
 const RONDAS = ['Clasificación','Análisis Financiero','Legal / Regulatorio','Destrucción del Caso','Pitch','Monitoreo'];
+/* ════════════════════════════════════════════════════════════════════
+   CapTableView — Registro real de tenedores (cap table on-chain)
+   Derivado de los eventos indexados del contrato PRE-GAT por el backend.
+   ════════════════════════════════════════════════════════════════════ */
+function CapTableView({toast}){
+  var API = window.__API_URL__ || '';
+  var [data,setData] = useState(null);
+  var [events,setEvents] = useState([]);
+  var [loading,setLoading] = useState(false);
+  function load(){
+    if(!API) return;
+    setLoading(true);
+    Promise.all([
+      fetch(API+'/admin/captable',{credentials:'include'}).then(function(r){return r.ok?r.json():Promise.reject();}),
+      fetch(API+'/admin/onchain-events?limit=25',{credentials:'include'}).then(function(r){return r.ok?r.json():Promise.reject();})
+    ]).then(function(res){ setData(res[0]); setEvents(res[1].data||[]); })
+      .catch(function(){ toast&&toast({type:'warn',title:'Sin datos',msg:'El indexador todavía no sincronizó eventos (corre cada 60s).'}); })
+      .finally(function(){ setLoading(false); });
+  }
+  useEffect(function(){ load(); },[]);
+  function exportCsv(){
+    if(!data||!data.holders||data.holders.length===0){ toast&&toast({type:'warn',title:'Sin tenedores',msg:'No hay datos para exportar.'}); return; }
+    downloadCsv('tokai_captable_pregat.csv',
+      ['Wallet','Certificados','Canjeados','Balance','KYC activo','Primer bloque','Último bloque','Contrato','Fecha reporte'],
+      data.holders.map(function(h){ return [h.wallet,h.minted,h.redeemed,h.balance,h.kyc_active?'SI':'NO',h.first_block,h.last_block,data.contract,new Date().toISOString()]; }));
+    toast&&toast({title:'Cap table exportado',msg:data.holders.length+' tenedores en CSV.'});
+  }
+  var cell={padding:'10px 12px',fontSize:12.5,color:'var(--txt-dim)',borderBottom:'1px solid rgba(255,255,255,.04)'};
+  return h('div',{},
+    h('div',{className:'eyebrow'},'Panel TOKAI · Registro de tenedores'),
+    h('h1',{className:'page'},'Cap Table on-chain'),
+    h('p',{className:'page-sub'},'Registro real de tenedores derivado de los eventos del contrato PRE-GAT en Polygon, indexados por el backend. Fuente de verdad para el registro de valores negociables y la reconciliación off-chain/on-chain.'),
+    h('div',{style:{display:'flex',gap:8,marginBottom:16}},
+      h('button',{className:'btn btn-ghost btn-sm',onClick:load,disabled:loading},loading?'Sincronizando…':'↻ Actualizar'),
+      h('button',{className:'btn btn-primary btn-sm',onClick:exportCsv},'⬇ Exportar CSV')),
+    data&&h('div',{className:'grid',style:{gridTemplateColumns:'repeat(4,1fr)',marginBottom:18}},
+      h('div',{className:'card stat-card'},h('div',{className:'stat-label'},'Tenedores'),h('div',{className:'stat-val'},data.count)),
+      h('div',{className:'card stat-card'},h('div',{className:'stat-label'},'Emitidos'),h('div',{className:'stat-val emerald'},data.totals.minted)),
+      h('div',{className:'card stat-card'},h('div',{className:'stat-label'},'Canjeados'),h('div',{className:'stat-val'},data.totals.redeemed)),
+      h('div',{className:'card stat-card'},h('div',{className:'stat-label'},'En circulación'),h('div',{className:'stat-val emerald'},data.totals.balance))),
+    h('div',{className:'card',style:{padding:0,overflowX:'auto',marginBottom:20}},
+      h('table',{style:{width:'100%',borderCollapse:'collapse'}},
+        h('thead',{},h('tr',{},['Wallet','Certificados','Canjeados','Balance','KYC on-chain','Actividad (bloques)'].map(function(x){return h('th',{key:x,style:{padding:'10px 12px',textAlign:'left',fontSize:11,color:'var(--txt-mute)',textTransform:'uppercase',letterSpacing:'.05em',borderBottom:'1px solid var(--line-solid)',background:'rgba(255,255,255,.02)'}},x);}))),
+        h('tbody',{},
+          (!data||data.holders.length===0)
+            ? h('tr',{},h('td',{colSpan:6,style:{padding:'32px',textAlign:'center',color:'var(--txt-mute)'}},API?'El indexador sincroniza cada 60s — actualizá en un momento.':'Requiere conexión al backend.'))
+            : data.holders.map(function(hld){
+                return h('tr',{key:hld.wallet},
+                  h('td',{style:Object.assign({},cell,{fontFamily:'var(--mono)',fontSize:11})},hld.wallet.slice(0,10)+'…'+hld.wallet.slice(-6)),
+                  h('td',{style:cell},hld.minted),
+                  h('td',{style:cell},hld.redeemed),
+                  h('td',{style:Object.assign({},cell,{fontWeight:700,color:hld.balance>0?'var(--emerald)':'var(--txt-mute)'})},hld.balance),
+                  h('td',{style:cell},h('span',{style:{padding:'2px 8px',borderRadius:8,fontSize:10,fontWeight:700,background:hld.kyc_active?'rgba(0,214,126,.12)':'rgba(255,178,62,.12)',color:hld.kyc_active?'var(--emerald)':'#FFB23E'}},hld.kyc_active?'ACTIVO':'REMOVIDO')),
+                  h('td',{style:Object.assign({},cell,{fontFamily:'var(--mono)',fontSize:10.5})},hld.first_block+' → '+hld.last_block));
+              })))),
+    events.length>0&&h('div',{},
+      h('h2',{style:{fontSize:16,fontWeight:700,marginBottom:12}},'Últimos eventos indexados'),
+      h('div',{className:'card'},
+        events.map(function(ev){
+          return h('div',{key:ev.id,className:'log-line'},
+            h('span',{className:'t'},'#'+ev.block_number),
+            h('span',{className:'ev'},ev.event_name),
+            h('span',{},(ev.wallet?ev.wallet.slice(0,10)+'… ':'')+(ev.token_id!=null?('· token #'+ev.token_id):'')));
+        }))));
+}
+
 function TokaiView({chain,toast,subView,go}){
   const totalRaised = chain.projects.reduce((s,p)=>s+p.raised,0);
   const totalKyc = Object.values(chain.identities).filter(i=>i.verified).length;
@@ -2745,7 +2811,7 @@ function TokaiView({chain,toast,subView,go}){
   }).length;
 
   var pagosPend = (chain.solicitudes||[]).filter(function(s){return s.status==='pending';}).length;
-  const TABS=[{k:'dashboard',l:'Dashboard'},{k:'psav',l:'PSAV'+(psavPendiente>0?' ⚠'+psavPendiente:'')},{k:'kyc',l:'Identidades'},{k:'checklist',l:'Checklist'},{k:'geofencing',l:'Geofencing'},{k:'accesos',l:'Accesos'+(pagosPend>0?' ⚠'+pagosPend:'')}];
+  const TABS=[{k:'dashboard',l:'Dashboard'},{k:'psav',l:'PSAV'+(psavPendiente>0?' ⚠'+psavPendiente:'')},{k:'kyc',l:'Identidades'},{k:'checklist',l:'Checklist'},{k:'geofencing',l:'Geofencing'},{k:'accesos',l:'Accesos'+(pagosPend>0?' ⚠'+pagosPend:'')},{k:'captable',l:'Cap Table'}];
 
   return h('div',{},
     h('div',{className:'eyebrow'},'Laboratorio · supervisión'),
@@ -2836,6 +2902,7 @@ function TokaiView({chain,toast,subView,go}){
     tab==='kyc'       && h(AdminKycDual,      {chain,toast}),
     tab==='checklist' && h(EmissionChecklist, {chain,toast}),
     tab==='accesos'   && h(AdminAccesos, {chain,toast}),
+    tab==='captable'  && h(CapTableView, {toast}),
     tab==='geofencing' && h(AdminGeofencing, {chain,toast}),
     tab==='thesis-editor' && h(ThesisFlexEditor, {chain,toast,go}),
     tab==='report-gen' && h(ReportExporter, {chain,toast}),
