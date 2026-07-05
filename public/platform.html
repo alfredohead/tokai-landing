@@ -6428,9 +6428,21 @@ function AdminAccesos({ chain, toast }) {
   }
   function reviewKycEntry(id, action) {
     if (!API) return;
+    var entry = kycRows.find(function(k){ return k.id === id; });
     fetch(API + '/admin/kyc/' + id + '/' + action, { method: 'POST', credentials: 'include' })
       .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
-      .then(function(){ loadKyc(); toast && toast({ title: action === 'approve' ? 'KYC aprobado' : 'KYC rechazado', msg: 'La verificación fue actualizada.' }); })
+      .then(function(){
+        loadKyc();
+        /* Automatización por la factory: aprobación off-chain → registro on-chain inmediato */
+        if(action === 'approve' && entry && entry.wallet_address && (typeof window !== 'undefined') && window.__PREGAT__ && typeof preGATWhitelistOnChain === 'function'){
+          toast && toast({ title: 'KYC aprobado', msg: 'Registrando la wallet on-chain — firmá la transacción en MetaMask…' });
+          preGATWhitelistOnChain(entry.wallet_address)
+            .then(function(hash){ toast && toast({ title: 'KYC on-chain ✓', msg: entry.wallet_address.slice(0,10) + '… habilitado en el contrato de la factory.', hash: hash }); })
+            .catch(function(e){ toast && toast({ type: 'warn', title: 'Registro on-chain pendiente', msg: ((e && e.message) || 'No se pudo firmar.') + ' Podés completarlo desde Emisión → PRE-GAT → Whitelist.' }); });
+          return;
+        }
+        toast && toast({ title: action === 'approve' ? 'KYC aprobado' : 'KYC rechazado', msg: 'La verificación fue actualizada.' });
+      })
       .catch(function(){ toast && toast({ type: 'err', title: 'Error', msg: 'No se pudo actualizar la verificación.' }); });
   }
   function actInvestOrder(id, action) {
@@ -6791,6 +6803,38 @@ var PREGAT_READ_ABI = [
   "function phase2Active() view returns (bool)",
   "function balanceOf(address) view returns (uint256)"
 ];
+
+/* ── Automatización KYC por la factory TOKAI ──
+   Al aprobar un KYC en el panel, la wallet se registra directamente en el
+   contrato (GATCertificate.addQualifiedInvestor / IdentityRegistry) firmando
+   con la wallet COMPLIANCE_ROLE del admin via MetaMask. Sin proveedor externo:
+   la capa de enforcement es la propia factory de TOKAI. */
+async function preGATWhitelistOnChain(addr){
+  var cfg = (typeof window !== 'undefined') && window.__PREGAT__;
+  if(!cfg || !window.ethers) throw new Error('Config PRE-GAT o ethers no disponibles');
+  if(!window.ethereum) throw new Error('MetaMask no disponible — registrá la wallet desde PRE-GAT → Whitelist');
+  var mm = Array.isArray(window.ethereum.providers)
+    ? (window.ethereum.providers.find(function(p){ return p.isMetaMask; }) || null)
+    : (window.ethereum.isMetaMask ? window.ethereum : null);
+  if(!mm) throw new Error('MetaMask no encontrado');
+  var currentChain = await mm.request({ method: 'eth_chainId' });
+  if (parseInt(currentChain, 16) !== cfg.chainId) {
+    try {
+      await mm.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x89' }] });
+    } catch(swErr) {
+      if (swErr.code === 4902) {
+        await mm.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x89', chainName: 'Polygon PoS', nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 }, rpcUrls: [cfg.rpc], blockExplorerUrls: [cfg.explorer] }] });
+      } else throw swErr;
+    }
+  }
+  var provider = new ethers.BrowserProvider(mm);
+  var signer = await provider.getSigner();
+  var abi = (window.__ABIS__ && window.__ABIS__.GATCertificate) || PREGAT_READ_ABI;
+  var contract = new ethers.Contract(cfg.address, abi, signer);
+  var tx = await contract.addQualifiedInvestor(addr);
+  await tx.wait();
+  return tx.hash;
+}
 
 function usePreGAT(walletAddr) {
   var cfg = (typeof window !== 'undefined') && window.__PREGAT__;
