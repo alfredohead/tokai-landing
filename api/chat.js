@@ -9,6 +9,15 @@ const ALLOWED_ORIGINS = new Set([
   'https://www.tokairwa.online',
 ]);
 
+function cleanEnv(value) {
+  return (value || '').replace(/^\uFEFF/, '').trim();
+}
+
+function deepSeekModel() {
+  const model = cleanEnv(process.env.DEEPSEEK_MODEL) || 'deepseek-v4-flash';
+  return model === 'deepseek-chat' ? 'deepseek-v4-flash' : model;
+}
+
 export default async function handler(req, res) {
   // CORS restringido al dominio propio
   const origin = req.headers.origin || '';
@@ -29,7 +38,7 @@ export default async function handler(req, res) {
   rateLimit.set(ip, entry);
   if (entry.count > RATE_LIMIT) return res.status(429).json({ error: 'Demasiadas solicitudes. Esperá un momento.' });
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = cleanEnv(process.env.DEEPSEEK_API_KEY);
   if (!apiKey) return res.status(500).json({ error: 'API key no configurada' });
 
   const { messages } = req.body || {};
@@ -59,27 +68,29 @@ IMPORTANTE:
 VERTICALES: Rodados/Movilidad, Inmobiliario, Security Tokens, Asset-Backed, Utility/Gobernanza, Financieros, Híbridos.`;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
+        'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: deepSeekModel(),
         max_tokens: 1024,
-        system: SYSTEM,
-        messages
+        messages: [
+          { role: 'system', content: SYSTEM },
+          ...messages
+        ]
       })
     });
 
     const data = await response.json();
     if (!response.ok) return res.status(response.status).json({ error: data.error?.message || 'Error de IA' });
 
-    const reply = data.content?.filter(b => b.type === 'text').map(b => b.text).join('') || '';
+    const reply = data.choices?.[0]?.message?.content || '';
     return res.status(200).json({ reply });
   } catch (err) {
+    console.error('Landing AI proxy error', err);
     return res.status(500).json({ error: 'Error interno. Intentá de nuevo.' });
   }
 }
