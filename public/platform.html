@@ -3633,7 +3633,7 @@ function WizardCrear({chain, toast, go}){
     const soulbound = f.kind==='club' || !!strategy.soulbound;
     const jurCfg = (ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR']);
     const regDerived = jurCfg.regimes[f.audience] || jurCfg.regimes['calificados'] || strategy.regime || 'Regimen regulado';
-    const isRg1069 = f.audience === 'todos';
+    const isRg1069 = f.issuerJurisdiction === 'AR' && f.audience === 'todos';
     const emissionStack = isRg1069 ? [
       { stage: 1, key: 'pregat', symbol: 'PRE-' + symbol, standard: 'ERC-721', role: 'certificado_soulbound', label: 'Certificado soulbound de preventa', status: 'operable', jurisdiction: f.issuerJurisdiction, regime: regDerived },
       { stage: 2, key: 'gat', symbol: symbol, standard: 'ERC-3643', role: 'token_definitivo', label: 'Token definitivo regulado', status: 'pendiente_factory', jurisdiction: f.issuerJurisdiction, regime: regDerived }
@@ -3850,15 +3850,26 @@ function WizardCrear({chain, toast, go}){
               h('div',{style:{fontSize:10.5,color:'var(--txt-mute)',lineHeight:1.3}},prov.desc));
           }))),
 
-      f.audience==='todos'&&h('div',{className:'card',style:{padding:'12px 14px',marginBottom:16,borderLeft:'3px solid var(--emerald)'}},
-        h('div',{style:{fontWeight:800,fontSize:13,marginBottom:8}},'Arquitectura de emision compuesta RG 1069'),
-        h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}},
-          h('div',{style:{padding:'10px 12px',borderRadius:8,background:'rgba(0,214,126,.05)',border:'1px solid rgba(0,214,126,.15)'}},
-            h('div',{style:{fontFamily:'var(--mono)',fontSize:10,color:'var(--emerald)',marginBottom:4}},'ETAPA 1 · PRE-'+((f.name.replace(/[^A-Za-z]/g,'').slice(0,4).toUpperCase())||'GAT')),
-            h('div',{style:{fontSize:12,color:'var(--txt-dim)',lineHeight:1.45}},'Certificado soulbound ERC-721 para preventa, whitelist y trazabilidad de inversores.')),
-          h('div',{style:{padding:'10px 12px',borderRadius:8,background:'rgba(255,178,62,.06)',border:'1px solid rgba(255,178,62,.18)'}},
-            h('div',{style:{fontFamily:'var(--mono)',fontSize:10,color:'#FFB23E',marginBottom:4}},'ETAPA 2 · '+((f.name.replace(/[^A-Za-z]/g,'').slice(0,4).toUpperCase())||'GAT')),
-            h('div',{style:{fontSize:12,color:'var(--txt-dim)',lineHeight:1.45}},'Token definitivo ERC-3643 bajo TokenFactory TOKAI. El canje quema el certificado PRE-GAT.')))),
+      f.audience==='todos'&&(function(){
+        const _jur2 = ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR'];
+        const _isAR = f.issuerJurisdiction === 'AR';
+        const _sym = (f.name.replace(/[^A-Za-z]/g,'').slice(0,4).toUpperCase())||'GAT';
+        const _archTitle = _isAR
+          ? 'Arquitectura de emisión compuesta · RG 1069'
+          : 'Arquitectura de emisión compuesta · ' + _jur2.label;
+        const _stage2Desc = _isAR
+          ? 'Token definitivo ERC-3643 bajo TokenFactory TOKAI. El canje quema el certificado soulbound.'
+          : 'Token definitivo regulado bajo la normativa de ' + _jur2.label + '. El canje quema el certificado soulbound.';
+        return h('div',{className:'card',style:{padding:'12px 14px',marginBottom:16,borderLeft:'3px solid var(--emerald)'}},
+          h('div',{style:{fontWeight:800,fontSize:13,marginBottom:8}},_archTitle),
+          h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}},
+            h('div',{style:{padding:'10px 12px',borderRadius:8,background:'rgba(0,214,126,.05)',border:'1px solid rgba(0,214,126,.15)'}},
+              h('div',{style:{fontFamily:'var(--mono)',fontSize:10,color:'var(--emerald)',marginBottom:4}},'ETAPA 1 · PRE-'+_sym),
+              h('div',{style:{fontSize:12,color:'var(--txt-dim)',lineHeight:1.45}},'Certificado soulbound ERC-721 para preventa, whitelist y trazabilidad de inversores.')),
+            h('div',{style:{padding:'10px 12px',borderRadius:8,background:'rgba(255,178,62,.06)',border:'1px solid rgba(255,178,62,.18)'}},
+              h('div',{style:{fontFamily:'var(--mono)',fontSize:10,color:'#FFB23E',marginBottom:4}},'ETAPA 2 · '+_sym),
+              h('div',{style:{fontSize:12,color:'var(--txt-dim)',lineHeight:1.45}},_stage2Desc))));
+      })(),
 
       h('button',{onClick:()=>setAdv(!adv),style:{background:'none',border:'none',color:'var(--txt-mute)',fontSize:12,cursor:'pointer',marginTop:6,textDecoration:'underline'}},
         adv?'Ocultar detalle técnico':'Ver detalle técnico'),
@@ -3959,7 +3970,8 @@ function WizardCrear({chain, toast, go}){
               h('div', { style: { fontWeight: 700, color: 'var(--txt)' } }, f.kind==='club'? 'SBT (Acceso)' : 'USD ' + Math.round(price).toLocaleString())),
             h('div', { style: { textAlign: 'right' } },
               h('div', { style: { color: 'var(--txt-mute)', fontSize: 8, textTransform: 'uppercase', marginBottom: 2 } }, 'Regulación'),
-              h('div', { style: { fontWeight: 700, color: 'var(--emerald)' } }, f.audience==='todos'? 'RG 1069 (Pública)' : 'RG 1088 (Privada)')))
+              h('div', { style: { fontWeight: 700, color: 'var(--emerald)' } },
+                (ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR']).regimes[f.audience]||(f.audience==='todos'?'Oferta pública':'Oferta privada'))))
         ))
     ),
 
