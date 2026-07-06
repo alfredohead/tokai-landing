@@ -19,6 +19,8 @@ window.__DEPLOYMENT__ = window.__DEPLOYMENT__ || null;
    2 certificados emitidos (INV-001). */
 window.__PREGAT__ = window.__PREGAT__ || {
   address:  '0xf9e16618297e51C6908746C86B115C5497672A53',
+  symbol:   'PRE-GAT',
+  projectName: 'Grand Alyson',
   chainId:  137,
   network:  'polygon',
   rpc:      'https://polygon-bor-rpc.publicnode.com',
@@ -2971,10 +2973,10 @@ function CapTableView({toast, chain}){
   return h('div',{},
     h('div',{className:'eyebrow'},'Panel TOKAI · Registro de tenedores'),
     h('h1',{className:'page'},'Cap Table del proyecto'),
-    h('p',{className:'page-sub'},'Registro real de tenedores del instrumento PRE-GAT dentro del Proyecto GAT. Es la fuente de verdad para reconciliar etapa 1, canjes y posterior entrega del GAT definitivo.'),
+    h('p',{className:'page-sub'},'Registro real de tenedores del instrumento ' + (selectedProject && selectedProject.symbol ? 'PRE-' + selectedProject.symbol : 'Soulbound') + ' dentro del Proyecto ' + (selectedProject ? selectedProject.name : 'GAT') + '. Es la fuente de verdad para reconciliar etapa 1, canjes y posterior entrega del ' + (selectedProject ? selectedProject.symbol : 'Token') + ' definitivo.'),
     h('div',{className:'card',style:{padding:'12px 14px',marginBottom:16,borderLeft:'3px solid var(--emerald)'}},
       h('div',{style:{fontWeight:800,fontSize:13,marginBottom:4}},projectLabel(selectedProject)),
-      h('div',{style:{color:'var(--txt-dim)',fontSize:12,lineHeight:1.55}},'PRE-GAT es el certificado de preventa del proyecto. GAT definitivo es la etapa 2: el canje quema el certificado y habilita la entrega del instrumento final.')),
+      h('div',{style:{color:'var(--txt-dim)',fontSize:12,lineHeight:1.55}}, (selectedProject && selectedProject.symbol ? 'PRE-' + selectedProject.symbol : 'PRE-GAT') + ' es el certificado de preventa del proyecto. ' + (selectedProject ? selectedProject.symbol : 'GAT') + ' definitivo es la etapa 2: el canje quema el certificado y habilita la entrega del instrumento final.')),
     h('div',{style:{display:'flex',gap:8,marginBottom:16}},
       projects.length>0&&h('select',{value:selectedProjectId,onChange:function(e){ setSelectedProjectId(e.target.value); },
         style:{background:'var(--panel2)',border:'1px solid var(--line-solid)',borderRadius:8,padding:'7px 10px',color:'var(--txt)',fontSize:12}},
@@ -4051,7 +4053,7 @@ function WizardCrear({chain, toast, go}){
       f.audience==='todos'&&(function(){
         const _jur2 = ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR'];
         const _isAR = f.issuerJurisdiction === 'AR';
-        const _sym = (f.name.replace(/[^A-Za-z]/g,'').slice(0,4).toUpperCase())||'GAT';
+        const _sym = (f.name.replace(/[^A-Za-z]/g,'').slice(0,4).toUpperCase())||'TKN';
         const _archTitle = _isAR
           ? 'Arquitectura de emisión compuesta · RG 1069'
           : 'Arquitectura de emisión compuesta · ' + _jur2.label;
@@ -4078,7 +4080,7 @@ function WizardCrear({chain, toast, go}){
           'KYC Provider: '+((KYC_PROVIDERS[f.kycProvider]||{}).label||f.kycProvider),h('br'),
           'Lock-up: '+(f.audience==='todos'?'0 días':'180 días'),h('br'),
           'Tope de holders: '+(f.audience==='todos'?'sin tope':'50'),h('br'),
-          'Estándar: '+f.tokenStandard+' · '+( f.tokenStandard==='ERC-721'?'Certificado soulbound (PRE-GAT)':'Permisionado con identidad'),h('br'),
+          'Estándar: '+f.tokenStandard+' · '+( f.tokenStandard==='ERC-721'?'Certificado soulbound (Preventa)':'Permisionado con identidad'),h('br'),
           'Soulbound: '+(f.kind==='club'||f.tokenStandard==='ERC-721'?'sí (intransferible)':'no'))),
 
       /* ── Selector de estándar v3.4.0 — 6 estándares (ADR-007) ── */
@@ -6809,7 +6811,7 @@ function AdminAccesos({ chain, toast }) {
           toast && toast({ title: 'KYC aprobado', msg: 'Registrando la wallet on-chain — firmá la transacción en MetaMask…' });
           preGATWhitelistOnChain(entry.wallet_address)
             .then(function(hash){ toast && toast({ title: 'KYC on-chain ✓', msg: entry.wallet_address.slice(0,10) + '… habilitado en el contrato de la factory.', hash: hash }); })
-            .catch(function(e){ toast && toast({ type: 'warn', title: 'Registro on-chain pendiente', msg: ((e && e.message) || 'No se pudo firmar.') + ' Podés completarlo desde Accesos → Whitelist on-chain o Instrumentos → PRE-GAT.' }); });
+            .catch(function(e){ toast && toast({ type: 'warn', title: 'Registro on-chain pendiente', msg: ((e && e.message) || 'No se pudo firmar.') + ' Podés completarlo desde Accesos → Whitelist on-chain o TOKAI → Instrumentos.' }); });
           return;
         }
         toast && toast({ title: action === 'approve' ? 'KYC aprobado' : 'KYC rechazado', msg: 'La verificación fue actualizada.' });
@@ -6843,7 +6845,7 @@ function AdminAccesos({ chain, toast }) {
 
     h('div', { className: 'card', style: { padding: '12px 14px', marginBottom: 16, borderLeft: '3px solid var(--emerald)' } },
       h('div', { style: { fontWeight: 800, fontSize: 13, marginBottom: 4 } }, 'Flujo correcto: cliente -> acceso -> proyecto'),
-      h('div', { style: { color: 'var(--txt-dim)', fontSize: 12, lineHeight: 1.55 } }, 'Primero se aprueba al emisor en Pendientes. Despues el cliente crea su proyecto en el wizard. Dentro de un mismo proyecto se pueden administrar emisiones compuestas: PRE-GAT como certificado soulbound de etapa 1 y GAT definitivo como etapa 2 bajo RG 1069. Whitelist, KYC, suscripciones y certificados son controles del proyecto, no modulos separados.')
+      h('div', { style: { color: 'var(--txt-dim)', fontSize: 12, lineHeight: 1.55 } }, 'Primero se aprueba al emisor en Pendientes. Despues el cliente crea su proyecto en el wizard. Dentro de un mismo proyecto se pueden administrar emisiones compuestas: un certificado soulbound como etapa 1 y el token regulado definitivo como etapa 2 (por ejemplo, PRE-GAT y GAT). Whitelist, KYC, suscripciones y certificados son controles del proyecto, no modulos separados.')
     ),
     (accessLoading || accessError) && h('div', { className: 'card', style: { padding: '10px 12px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderColor: accessError ? 'rgba(255,178,62,.35)' : 'rgba(0,214,126,.2)' } },
       h('div', { style: { color: accessError ? '#FFB23E' : 'var(--txt-dim)', fontSize: 12 } }, accessLoading ? 'Cargando solicitudes reales del backend...' : accessError),
@@ -7192,7 +7194,7 @@ var PREGAT_READ_ABI = [
 async function preGATWhitelistOnChain(addr){
   var cfg = (typeof window !== 'undefined') && window.__PREGAT__;
   if(!cfg || !window.ethers) throw new Error('Config PRE-GAT o ethers no disponibles');
-  if(!window.ethereum) throw new Error('MetaMask no disponible — registrá la wallet desde PRE-GAT → Whitelist');
+  if(!window.ethereum) throw new Error('MetaMask no disponible — registrá la wallet desde TOKAI → Instrumentos');
   var mm = Array.isArray(window.ethereum.providers)
     ? (window.ethereum.providers.find(function(p){ return p.isMetaMask; }) || null)
     : (window.ethereum.isMetaMask ? window.ethereum : null);
@@ -7451,7 +7453,7 @@ function PreGATAdminPanel({ toast, chain, project }) {
     setTxLoading(false);
   }
 
-  var tabs = [['dashboard','Dashboard'],['whitelist','Accesos on-chain'],['mint','Certificados'],['phase2','Canje GAT']];
+  var tabs = [['dashboard','Dashboard'],['whitelist','Accesos on-chain'],['mint','Certificados'],['phase2','Canje ' + (emissionStack[1] && emissionStack[1].symbol || 'definitivo')]];
 
   var pct = function(n, d){ return d > 0 ? ((n/d)*100).toFixed(1) : '0.0'; };
   var emissionStack = getEmissionStack(selectedProject);
@@ -7480,7 +7482,7 @@ function PreGATAdminPanel({ toast, chain, project }) {
           var stg1 = emissionStack[0] && emissionStack[0].symbol;
           var stg2 = emissionStack[1] && emissionStack[1].symbol;
           if(arch === 'composite_1069_pregat_to_gat')
-            return stg1 + ' es la etapa 1: registra wallets autorizadas y emite certificados de preventa (RG 1069). ' + (stg2||'GAT') + ' es la etapa 2: el canje quema el certificado y entrega el instrumento final regulado por CNV.';
+            return stg1 + ' es la etapa 1: registra wallets autorizadas y emite certificados de preventa (RG 1069). ' + (stg2||'definitivo') + ' es la etapa 2: el canje quema el certificado y entrega el instrumento final regulado por CNV.';
           if(arch === 'composite_local_soulbound_to_token' || (emissionStack.length > 1))
             return (stg1||'Soulbound') + ' es la etapa 1: certificado soulbound de preventa y whitelist para la jurisdicción del emisor. ' + (stg2||'Token') + ' es la etapa 2: token regulado bajo la normativa local. El canje quema el certificado.';
           return 'Instrumento único. El contrato gestiona la emisión, los derechos económicos y las reglas de compliance directamente.';
@@ -7597,7 +7599,7 @@ function PreGATAdminPanel({ toast, chain, project }) {
     /* Emisión */
     tab === 'mint' && h('div', {},
       h('div', { className: 'card', style: { padding: '14px 16px' } },
-        h('div', { style: { fontWeight: 700, fontSize: 13, marginBottom: 6 } }, 'Emitir certificados PRE-GAT'),
+        h('div', { style: { fontWeight: 700, fontSize: 13, marginBottom: 6 } }, 'Emitir ' + (emissionStack[0] && emissionStack[0].symbol || 'Certificados')),
         h('p', { style: { fontSize: 12, color: 'var(--txt-mute)', marginBottom: 12, lineHeight: 1.5 } }, 'Requiere rol OPERATOR_ROLE. La wallet debe estar previamente en whitelist. Verificar pago acreditado y KYC aprobado antes de emitir.'),
         h('div', { className: 'field' },
           h('label', {}, 'Wallet del inversor (debe estar en whitelist)'),
@@ -7611,7 +7613,7 @@ function PreGATAdminPanel({ toast, chain, project }) {
           'Supply disponible: ', h('strong', {}, s.remainingSupply), ' certificados · USD ', h('strong', {}, (mintQty * 3000).toLocaleString()), ' por emitir'
         ),
         h('button', { className: 'btn btn-primary', onClick: doMint, disabled: !isValidAddr(mintAddr) || mintQty < 1 || txLoading || (s && mintQty > s.remainingSupply) },
-          txLoading ? 'Firmando con MetaMask…' : 'Emitir ' + mintQty + ' PRE-GAT → ' + (mintAddr ? mintAddr.slice(0,10)+'…' : 'wallet')
+          txLoading ? 'Firmando con MetaMask…' : 'Emitir ' + mintQty + ' ' + (emissionStack[0] && emissionStack[0].symbol || 'Certificados') + ' → ' + (mintAddr ? mintAddr.slice(0,10)+'…' : 'wallet')
         )
       )
     ),
@@ -7619,8 +7621,8 @@ function PreGATAdminPanel({ toast, chain, project }) {
     /* Fase 2 */
     tab === 'phase2' && h('div', {},
       h('div', { className: 'card', style: { padding: '14px 16px', borderLeft: '3px solid ' + (s && s.phase2Active ? 'var(--emerald)' : '#FFB23E') } },
-        h('div', { style: { fontWeight: 700, fontSize: 13, marginBottom: 6 } }, 'Control de Fase 2 — Canje PRE-GAT → GAT'),
-        h('p', { style: { fontSize: 12, color: 'var(--txt-mute)', marginBottom: 12, lineHeight: 1.5 } }, 'La Fase 2 permite a los inversores ejecutar redeem() y canjear su PRE-GAT por el GAT definitivo. Requiere DEFAULT_ADMIN_ROLE. Solo activar cuando el proyecto haya completado las condiciones regulatorias y el token GAT definitivo este desplegado por TokenFactory TOKAI con evidencia ProjectDeployed.'),
+        h('div', { style: { fontWeight: 700, fontSize: 13, marginBottom: 6 } }, 'Control de Fase 2 — Canje ' + (emissionStack[0] && emissionStack[0].symbol || 'Soulbound') + ' → ' + (emissionStack[1] && emissionStack[1].symbol || 'definitivo')),
+        h('p', { style: { fontSize: 12, color: 'var(--txt-mute)', marginBottom: 12, lineHeight: 1.5 } }, 'La Fase 2 permite a los inversores ejecutar redeem() y canjear su ' + (emissionStack[0] && emissionStack[0].symbol || 'certificado') + ' por el token definitivo. Requiere DEFAULT_ADMIN_ROLE. Solo activar cuando el proyecto haya completado las condiciones regulatorias y el token definitivo este desplegado por TokenFactory TOKAI con evidencia ProjectDeployed.'),
         s && h('div', { style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 } },
           h('span', { className: 'badge ' + (s.phase2Active ? 'green' : 'amber'), style: { fontSize: 12 } }, s.phase2Active ? '● FASE 2 ACTIVA' : '● FASE 2 INACTIVA'),
           h('span', { style: { fontSize: 12, color: 'var(--txt-dim)' } }, s.totalRedeemed + ' canjeados hasta ahora')
@@ -7629,9 +7631,9 @@ function PreGATAdminPanel({ toast, chain, project }) {
         h('div', {},
           h('div', { style: { padding: '10px 12px', borderRadius: 8, background: 'rgba(255,178,62,.08)', border: '1px solid rgba(255,178,62,.2)', fontSize: 12, marginBottom: 12, lineHeight: 1.6 } },
             h('strong', { style: { color: '#FFB23E' } }, '⚠ Condiciones previas obligatorias:'), h('br'),
-            '1. Habilitación CNV bajo RG 1069/2025', h('br'),
-            '2. Fiduciario institucional del FF firmado y operativo', h('br'),
-            '3. GAT definitivo (ERC-3643) desplegado por TokenFactory TOKAI en Polygon PoS', h('br'),
+            '1. Habilitación regulatoria bajo normativa local', h('br'),
+            '2. Fiduciario institucional firmado y operativo', h('br'),
+            '3. Token definitivo (ERC-3643) desplegado por TokenFactory TOKAI en Polygon PoS', h('br'),
             '4. Backend indexador de CertificateRedeemed operativo', h('br'),
             '5. Smoke test de canje en testnet exitoso'
           ),
@@ -7659,13 +7661,15 @@ function PreGATLiveCard({ walletAddr, compact=false }) {
   var explorerAddr = function(addr){ return cfg.explorer + '/address/' + addr; };
   var explorerToken = cfg.explorer + '/token/' + cfg.address + (walletAddr ? '?a=' + walletAddr : '');
 
+  var symbol = (cfg && cfg.symbol) || 'PRE-GAT';
+  var projectName = (cfg && cfg.projectName) || 'Grand Alyson';
   return h('div', { style: { marginBottom: compact ? 14 : 22 } },
-    h('div', { className: 'eyebrow', style: { marginBottom: 8 } }, 'Modo Real · PRE-GAT live'),
+    h('div', { className: 'eyebrow', style: { marginBottom: 8 } }, 'Modo Real · ' + symbol + ' live'),
     h('div', { className: 'card', style: { padding: compact ? '14px 16px' : 20, borderLeft: '3px solid var(--emerald)', background: 'rgba(0,214,126,.025)' } },
       h('div', { className: 'between', style: { alignItems: 'flex-start', gap: 16, marginBottom: 14 } },
         h('div', {},
           h('div', { style: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 5 } },
-            h('h3', { style: { fontSize: compact ? 14 : 17, fontWeight: 800, margin: 0 } }, 'Certificados PRE-GAT · Grand Alyson'),
+            h('h3', { style: { fontSize: compact ? 14 : 17, fontWeight: 800, margin: 0 } }, 'Certificados ' + symbol + ' · ' + projectName),
             h('span', { className: 'badge green' }, 'POLYGON LIVE'),
             h('span', { className: 'badge amber' }, 'SOULBOUND ERC-721')
           ),
@@ -7726,12 +7730,14 @@ function PreGATInvestorCard({ walletAddr, toast }) {
   var explorerAddr = function(addr){ return cfg.explorer + '/address/' + addr; };
   var explorerContract = cfg.explorer + '/token/' + cfg.address + '?a=' + walletAddr;
 
+  var symbol = (cfg && cfg.symbol) || 'PRE-GAT';
+  var projectName = (cfg && cfg.projectName) || 'Grand Alyson';
   return h('div', { style: { marginTop: 20 } },
-    h('div', { className: 'eyebrow', style: { marginBottom: 8 } }, 'PRE-GAT · Polygon PoS Mainnet'),
+    h('div', { className: 'eyebrow', style: { marginBottom: 8 } }, symbol + ' · Polygon PoS Mainnet'),
     h('div', { className: 'card', style: { padding: '14px 16px', borderLeft: '3px solid var(--emerald)', background: 'rgba(0,214,126,.02)' } },
       h('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' } },
         h('div', {},
-          h('div', { style: { fontWeight: 700, fontSize: 14, marginBottom: 4 } }, 'Certificados PRE-GAT · Grand Alyson'),
+          h('div', { style: { fontWeight: 700, fontSize: 14, marginBottom: 4 } }, 'Certificados ' + symbol + ' · ' + projectName),
           h('div', { style: { fontSize: 12, color: 'var(--txt-dim)', marginBottom: 8 } }, 'Fideicomiso Ordinario · San Martín, Mendoza · Soulbound ERC-721'),
           h('div', { style: { display: 'flex', gap: 12, fontSize: 12, fontFamily: 'var(--mono)' } },
             h('span', {}, h('strong', { style: { color: 'var(--emerald)' } }, info.balance), ' certificado(s)'),
@@ -7989,7 +7995,7 @@ function App(){
           h('div',{style:{display:'flex',alignItems:'center',gap:14}},
             h('button',{className:'menu-btn',onClick:()=>setSidebarOpen(true)},h(Icon,{d:'M3 12h18M3 6h18M3 18h18',style:{width:18,height:18}})),
             h('span',{className:'topbar-title'},simpleTitles[view]||'TOKAI'),
-            h('span',{className:'badge '+(isReal?'green':'gray'),style:{fontSize:9,marginLeft:4}},isReal?(isLive?'● REAL WEB3':'● REAL PRE-GAT'):'DEMO')),
+            h('span',{className:'badge '+(isReal?'green':'gray'),style:{fontSize:9,marginLeft:4}},isReal?(isLive?'● REAL WEB3':'● REAL PREVENTA'):'DEMO')),
           h('div',{className:'topbar-right'},
             liveModeEnabled&&h('div',{className:'role-switch'},
               h('button',{className:'role-btn'+(!isReal?' active':''),onClick:()=>setMode('demo')},'Demo'),
@@ -8104,7 +8110,7 @@ function App(){
         h('div',{style:{display:'flex',alignItems:'center',gap:14}},
           h('button',{className:'menu-btn',onClick:()=>setSidebarOpen(true)},h(Icon,{d:'M3 12h18M3 6h18M3 18h18',style:{width:18,height:18}})),
           h('span',{className:'topbar-title'},view==='tokai'?(tokaiSubTitles[subView]||'Panel TOKAI'):titles[view]),
-          h('span',{className:'badge '+(isReal?'green':'gray'),style:{fontSize:9,marginLeft:4}},isReal?(isLive?'● REAL WEB3':'● REAL PRE-GAT'):'DEMO')),
+          h('span',{className:'badge '+(isReal?'green':'gray'),style:{fontSize:9,marginLeft:4}},isReal?(isLive?'● REAL WEB3':'● REAL PREVENTA'):'DEMO')),
         h('div',{className:'topbar-right'},
           liveModeEnabled&&h('div',{className:'role-switch'},
             h('button',{className:'role-btn'+(!isReal?' active':''),onClick:()=>setMode('demo')},'Demo'),
