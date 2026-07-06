@@ -600,7 +600,7 @@ function useChain(opts){
     // actualización optimista inmediata
     const id = projects.length;
     const p = {id,...cfg,token:genAddr(cfg.symbol+id),compliance:genAddr(cfg.symbol+'c'+id),totalSupply:0,raised:0,
-      banner:`linear-gradient(135deg,${cfg.color||'#1a4d8f'}33,${cfg.color||'#1a4d8f'})`};
+      banner:`linear-gradient(135deg,${cfg.color||'#1a4d8f'}33,${cfg.color||'#1a4d8f'})` };
     setProjects(ps=>[...ps,p]);
     log('ProjectCreated', `${cfg.name} (${cfg.symbol})`);
 
@@ -613,13 +613,19 @@ function useChain(opts){
           headers: {'Content-Type':'application/json'},
           body: JSON.stringify({
             name: cfg.name, symbol: cfg.symbol, vertical: cfg.vertical,
-            regime: cfg.regime || 'RG 1088', maxSupply: cfg.supplyMax || cfg.maxSupply || 0,
+            regime: cfg.regime || 'Oferta privada · calificados', maxSupply: cfg.supplyMax || cfg.maxSupply || 0,
             priceUsdCents: cfg.priceUsd ? Math.round(cfg.priceUsd * 100) : (cfg.priceUsdCents || 0),
             assetType: cfg.assetType, yieldMechanism: cfg.yieldMechanism,
             yieldAnnualPct: cfg.yieldAnnualPct || 0, valuationUsd: cfg.valuationUsd || 0,
             description: cfg.desc || '', isSoulbound: cfg.soulbound || false,
             lockupDays: cfg.lockupDays || 0, maxHolders: cfg.maxHolders || 0,
             jurisdictions: cfg.jurisdictions || [32], color: cfg.color || '#1a4d8f',
+            // v3.5.0 — emissionStack completo desde el primer POST
+            tokenStandard: cfg.tokenStandard || 'ERC-3643',
+            walletRoles: cfg.walletRoles || {},
+            complianceRules: cfg.complianceRules || {},
+            phaseState: cfg.phaseState || {},
+            meta: cfg.meta || {},
           })
         });
         if(res.ok){
