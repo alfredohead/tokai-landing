@@ -1743,7 +1743,7 @@ function AdminView({chain,wallet,toast,subView}){
     h('h1',{className:'page'},'Administración'),
     h('p',{className:'page-sub'},'Gestión de proyectos, emisión primaria, distribución de yield, identidades y contenido de pitch para inversores.'),
     !subView && h('div',{className:'role-switch',style:{marginBottom:22,width:'fit-content'}},
-      [['projects','Proyectos'],['pitch','Pitch del emisor'],['emission','Estado emisión'],['mint','Emisión'],['yield','Yield'],['kyc','Identidades'],['pregat','Proyecto GAT · Certificados']].map(([k,l])=>
+      [['projects','Proyectos'],['pitch','Pitch del emisor'],['emission','Estado emisión'],['mint','Emisión'],['yield','Yield'],['kyc','Identidades'],['pregat','Instrumentos · PRE-GAT']].map(([k,l])=>
         h('button',{key:k,className:'role-btn '+(tab===k?'active':''),onClick:()=>setTabState(k)},l))),
     tab==='projects'&&h(AdminProjects,{chain,toast}),
     tab==='pitch'&&h(AdminPitch,{chain,toast}),
@@ -2826,8 +2826,8 @@ function TokaiView({chain,toast,subView,go}){
   return h('div',{},
     h('div',{className:'eyebrow'},'Laboratorio · supervisión'),
     h('h1',{className:'page'},'Panel TOKAI'),
-    !subView && h('div',{className:'role-switch',style:{marginBottom:20,width:'fit-content'}},
-      TABS.map(t=>h('button',{key:t.k,className:'role-btn '+(tab===t.k?'active':''),onClick:()=>setTabState(t.k)},t.l))),
+    h('div',{className:'role-switch',style:{marginBottom:20,width:'fit-content'}},
+      TABS.concat([{k:'instrumentos',l:'Instrumentos'}]).map(t=>h('button',{key:t.k,className:'role-btn '+(tab===t.k?'active':''),onClick:()=>{ setTabState(t.k); if(go) go('tokai',null,t.k); }},t.l))),
 
     tab==='dashboard'&&h('div',{},
       h('p',{className:'page-sub'},'Capa de estructuración y supervisión. TOKAI nunca custodia fondos ni es PSAV — estructura, supervisa y gobierna el gate de emisión.'),
@@ -2912,6 +2912,7 @@ function TokaiView({chain,toast,subView,go}){
     tab==='kyc'       && h(AdminKycDual,      {chain,toast}),
     tab==='checklist' && h(EmissionChecklist, {chain,toast}),
     tab==='accesos'   && h(AdminAccesos, {chain,toast}),
+    tab==='instrumentos' && h(PreGATAdminPanel,{toast}),
     tab==='captable'  && h(CapTableView, {toast}),
     tab==='geofencing' && h(AdminGeofencing, {chain,toast}),
     tab==='thesis-editor' && h(ThesisFlexEditor, {chain,toast,go}),
@@ -6538,7 +6539,7 @@ function AdminAccesos({ chain, toast }) {
           toast && toast({ title: 'KYC aprobado', msg: 'Registrando la wallet on-chain — firmá la transacción en MetaMask…' });
           preGATWhitelistOnChain(entry.wallet_address)
             .then(function(hash){ toast && toast({ title: 'KYC on-chain ✓', msg: entry.wallet_address.slice(0,10) + '… habilitado en el contrato de la factory.', hash: hash }); })
-            .catch(function(e){ toast && toast({ type: 'warn', title: 'Registro on-chain pendiente', msg: ((e && e.message) || 'No se pudo firmar.') + ' Podés completarlo desde Accesos → Whitelist on-chain o Proyecto GAT → Whitelist.' }); });
+            .catch(function(e){ toast && toast({ type: 'warn', title: 'Registro on-chain pendiente', msg: ((e && e.message) || 'No se pudo firmar.') + ' Podés completarlo desde Accesos → Whitelist on-chain o Instrumentos → PRE-GAT.' }); });
           return;
         }
         toast && toast({ title: action === 'approve' ? 'KYC aprobado' : 'KYC rechazado', msg: 'La verificación fue actualizada.' });
@@ -6571,8 +6572,8 @@ function AdminAccesos({ chain, toast }) {
     h('p', { className: 'page-sub' }, 'Los emisores llegan a través del formulario de contacto. TOKAI evalúa, prepara la propuesta fuera de la plataforma, y habilita el acceso cuando hay acuerdo.'),
 
     h('div', { className: 'card', style: { padding: '12px 14px', marginBottom: 16, borderLeft: '3px solid var(--emerald)' } },
-      h('div', { style: { fontWeight: 800, fontSize: 13, marginBottom: 4 } }, 'Flujo correcto: cliente -> acceso -> proyecto GAT'),
-      h('div', { style: { color: 'var(--txt-dim)', fontSize: 12, lineHeight: 1.55 } }, 'Primero se aprueba al emisor en Pendientes. Despues el cliente crea su proyecto GAT en el wizard. La whitelist, KYC, suscripciones y certificados PRE-GAT son controles del mismo proyecto, no un modulo separado.')
+      h('div', { style: { fontWeight: 800, fontSize: 13, marginBottom: 4 } }, 'Flujo correcto: cliente -> acceso -> proyecto'),
+      h('div', { style: { color: 'var(--txt-dim)', fontSize: 12, lineHeight: 1.55 } }, 'Primero se aprueba al emisor en Pendientes. Despues el cliente crea su proyecto en el wizard. La whitelist, KYC, suscripciones y certificados como PRE-GAT son controles asociados al proyecto, no modulos separados.')
     ),
     (accessLoading || accessError) && h('div', { className: 'card', style: { padding: '10px 12px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderColor: accessError ? 'rgba(255,178,62,.35)' : 'rgba(0,214,126,.2)' } },
       h('div', { style: { color: accessError ? '#FFB23E' : 'var(--txt-dim)', fontSize: 12 } }, accessLoading ? 'Cargando solicitudes reales del backend...' : accessError),
@@ -7184,7 +7185,7 @@ function PreGATAdminPanel({ toast }) {
     /* Header */
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 } },
       h('div', { style: { background: 'rgba(0,214,126,.12)', border: '1px solid rgba(0,214,126,.25)', borderRadius: 10, padding: '10px 14px' } },
-        h('div', { style: { fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--emerald)', letterSpacing: '.1em', marginBottom: 3 } }, 'PROYECTO GAT · CERTIFICADOS PRE-GAT'),
+        h('div', { style: { fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--emerald)', letterSpacing: '.1em', marginBottom: 3 } }, 'INSTRUMENTO · CERTIFICADOS PRE-GAT'),
         cfg && h('div', { style: { fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--txt-dim)' } },
           h('a', { href: explorerAddr(cfg.address), target: '_blank', rel: 'noopener noreferrer', style: { color: 'var(--emerald)', textDecoration: 'none' } }, cfg.address.slice(0,10)+'…'+cfg.address.slice(-6))
         )
@@ -7194,8 +7195,8 @@ function PreGATAdminPanel({ toast }) {
     ),
 
     h('div', { className: 'card', style: { padding: '12px 14px', marginBottom: 16, borderLeft: '3px solid var(--emerald)' } },
-      h('div', { style: { fontWeight: 800, fontSize: 13, marginBottom: 4 } }, 'PRE-GAT es el certificado de preventa del proyecto GAT'),
-      h('div', { style: { color: 'var(--txt-dim)', fontSize: 12, lineHeight: 1.55 } }, 'Este panel no crea un proyecto aparte: registra wallets autorizadas, emite certificados de preventa y habilita el canje futuro hacia el GAT definitivo cuando el proyecto complete sus condiciones.')
+      h('div', { style: { fontWeight: 800, fontSize: 13, marginBottom: 4 } }, 'PRE-GAT es un certificado de preventa asociado a un proyecto'),
+      h('div', { style: { color: 'var(--txt-dim)', fontSize: 12, lineHeight: 1.55 } }, 'Este panel no crea un proyecto aparte: opera instrumentos tokenizados vinculados a proyectos existentes. Para PRE-GAT registra wallets autorizadas, emite certificados de preventa y habilita el canje futuro cuando el proyecto complete sus condiciones.')
     ),
 
     /* Tabs */
@@ -7561,7 +7562,10 @@ function App(){
   useEffect(()=>{
     if(uiMode!=='expert') return;
     let target = view;
-    if(role==='tokai') target = view==='guide'?'guide':'tokai';
+    if(role==='tokai') {
+      const allowedTokaiViews = ['tokai','report-gen','emission-engine','emission-checklist','thesis-editor','dash','market','guide'];
+      target = allowedTokaiViews.includes(view) ? view : 'tokai';
+    }
     else if(role==='issuer') target = view==='guide'?'guide':(['invest','portfolio','asset'].includes(view)?'admin':(view==='tokai'?'admin':view));
     else target = view==='guide'?'guide':(['admin','tokai'].includes(view)?'dash':view);
     
@@ -7688,9 +7692,10 @@ function App(){
   const nav = {
     investor:[['dash','Proyectos',I.proj],['portfolio','Mi cartera',I.wallet],['invest','Suscribir',I.invest],['market','Mercado secundario',I.market],['guide','Guía de uso',I.doc]],
     issuer:[['dash','Proyectos',I.proj],['admin','Administración',I.admin],['market','Mercado secundario',I.market],['guide','Guía de uso',I.doc]],
-    tokai:[['tokai','Supervisión',I.flask],['report-gen','Reporte Modelo',I.doc],['emission-engine','Motor de Emisión',I.zap],['emission-checklist','Checklist',I.shield],['admin','Proyecto GAT',I.zap],['thesis-editor','Tesis de Valor',I.doc],['dash','Proyectos',I.proj],['market','Mercado secundario',I.market],['guide','Guía de uso',I.doc]],
+    tokai:[['tokai','Supervisión',I.flask,'dashboard'],['tokai','Accesos',I.admin,'accesos'],['tokai','Instrumentos',I.zap,'instrumentos'],['report-gen','Reporte Modelo',I.doc],['emission-engine','Motor de Emisión',I.zap],['emission-checklist','Checklist',I.shield],['thesis-editor','Tesis de Valor',I.doc],['dash','Proyectos',I.proj],['market','Mercado secundario',I.market],['guide','Guía de uso',I.doc]],
   }[role];
   const titles={dash:'Proyectos',asset:'Ficha del activo',invest:'Portal del inversor',portfolio:'Mi cartera',market:'Mercado secundario',tokai:'Panel TOKAI',admin:'Administración',guide:'Guía de uso','thesis-editor':'Tesis de Valor · TOKAI','thesis-client':'Tesis de Valor · Cliente','emission-engine':'Motor de Emisión','emission-checklist':'Checklist pre-emisión','report-gen':'Reporte del modelo'};
+  const tokaiSubTitles={dashboard:'Panel TOKAI',accesos:'Accesos',instrumentos:'Instrumentos',captable:'Cap Table',kyc:'Identidades',checklist:'Checklist',geofencing:'Geofencing',psav:'PSAV'};
 
   return h('div',{className:'app'},
     h('div',{className:'sidebar'+(sidebarOpen?' open':'')},
@@ -7699,7 +7704,7 @@ function App(){
         h('div',{className:'brand-txt'},h('span',{className:'brand-name'},'TOKAI'),h('span',{className:'brand-sub'},'RWA · LABORATORIO'))),
       h('div',{className:'nav'},
         h('div',{className:'nav-label'},role==='investor'?'Inversor':role==='issuer'?'Emisor':'Laboratorio'),
-        nav.map(([k,label,icon])=>h('button',{key:k,className:'nav-item'+(view===k||(k==='dash'&&view==='asset')?' active':''),onClick:()=>go(k)},
+        nav.map(([k,label,icon,sub])=>h('button',{key:k+(sub||''),className:'nav-item'+((view===k&&(!sub||subView===sub))||(k==='dash'&&view==='asset')?' active':''),onClick:()=>go(k,null,sub)},
           h(Icon,{d:icon}),label)),
         h('div',{style:{flex:1}}),
         h('div',{className:'nav-label'},'Demo'),
@@ -7770,7 +7775,7 @@ function App(){
       h('div',{className:'topbar'},
         h('div',{style:{display:'flex',alignItems:'center',gap:14}},
           h('button',{className:'menu-btn',onClick:()=>setSidebarOpen(true)},h(Icon,{d:'M3 12h18M3 6h18M3 18h18',style:{width:18,height:18}})),
-          h('span',{className:'topbar-title'},titles[view]),
+          h('span',{className:'topbar-title'},view==='tokai'?(tokaiSubTitles[subView]||'Panel TOKAI'):titles[view]),
           h('span',{className:'badge '+(isReal?'green':'gray'),style:{fontSize:9,marginLeft:4}},isReal?(isLive?'● REAL WEB3':'● REAL PRE-GAT'):'DEMO')),
         h('div',{className:'topbar-right'},
           liveModeEnabled&&h('div',{className:'role-switch'},
