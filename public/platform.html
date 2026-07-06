@@ -21,8 +21,8 @@ window.__PREGAT__ = window.__PREGAT__ || {
   address:  '0xf9e16618297e51C6908746C86B115C5497672A53',
   chainId:  137,
   network:  'polygon',
-  rpc:      'https://polygon-rpc.com',
-  rpcFallback: 'https://polygon.publicnode.com',
+  rpc:      'https://polygon-bor-rpc.publicnode.com',
+  rpcFallback: 'https://polygon.llamarpc.com',
   explorer: 'https://polygonscan.com',
   admin:    '0x110a0c7F2510075e4fD101BFa36B1837290F3976',
   snapshot: {
@@ -754,7 +754,7 @@ const NETWORKS = {
       chainId: '0x89',
       chainName: 'Polygon PoS',
       nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 },
-      rpcUrls: ['https://polygon-rpc.com', 'https://rpc-mainnet.matic.network'],
+      rpcUrls: ['https://polygon-bor-rpc.publicnode.com', 'https://polygon.llamarpc.com'],
       blockExplorerUrls: ['https://polygonscan.com'],
     }
   },
@@ -1743,7 +1743,7 @@ function AdminView({chain,wallet,toast,subView}){
     h('h1',{className:'page'},'Administración'),
     h('p',{className:'page-sub'},'Gestión de proyectos, emisión primaria, distribución de yield, identidades y contenido de pitch para inversores.'),
     !subView && h('div',{className:'role-switch',style:{marginBottom:22,width:'fit-content'}},
-      [['projects','Proyectos'],['pitch','Pitch del emisor'],['emission','Estado emisión'],['mint','Emisión'],['yield','Yield'],['kyc','Identidades'],['pregat','PRE-GAT ✦']].map(([k,l])=>
+      [['projects','Proyectos'],['pitch','Pitch del emisor'],['emission','Estado emisión'],['mint','Emisión'],['yield','Yield'],['kyc','Identidades'],['pregat','Proyecto GAT · Certificados']].map(([k,l])=>
         h('button',{key:k,className:'role-btn '+(tab===k?'active':''),onClick:()=>setTabState(k)},l))),
     tab==='projects'&&h(AdminProjects,{chain,toast}),
     tab==='pitch'&&h(AdminPitch,{chain,toast}),
@@ -6400,6 +6400,8 @@ function AdminAccesos({ chain, toast }) {
   var [backendRows, setBackendRows] = useState(null); // null = sin datos del backend todavía
   var [pagos, setPagos] = useState([]);
   var [tab, setTab] = useState('pending');
+  var [accessLoading, setAccessLoading] = useState(false);
+  var [accessError, setAccessError] = useState('');
 
   function mapContactRow(r){
     return {
@@ -6410,12 +6412,28 @@ function AdminAccesos({ chain, toast }) {
       approved: r.status === 'approved',
     };
   }
-  function loadSolicitudes(){
+  function loadSolicitudes(retry){
     if(!API) return;
+    setAccessLoading(true);
+    setAccessError('');
     fetch(API + '/admin/contact', { credentials: 'include' })
-      .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
-      .then(function(d){ setBackendRows((d.data || []).map(mapContactRow)); })
-      .catch(function(){});
+      .then(function(r){
+        if(r.ok) return r.json();
+        return Promise.reject({ status: r.status });
+      })
+      .then(function(d){
+        setBackendRows((d.data || []).map(mapContactRow));
+        setAccessLoading(false);
+      })
+      .catch(function(e){
+        if(!retry){
+          setTimeout(function(){ loadSolicitudes(true); }, 1400);
+          return;
+        }
+        setAccessLoading(false);
+        setBackendRows([]);
+        setAccessError(e && e.status === 401 ? 'Tu sesion admin no llego al backend. Sali y volve a entrar con un email administrador.' : 'No se pudo cargar Accesos. El backend puede estar despertando; toca Reintentar.');
+      });
   }
   function loadPagos(){
     if(!API) return;
@@ -6520,7 +6538,7 @@ function AdminAccesos({ chain, toast }) {
           toast && toast({ title: 'KYC aprobado', msg: 'Registrando la wallet on-chain — firmá la transacción en MetaMask…' });
           preGATWhitelistOnChain(entry.wallet_address)
             .then(function(hash){ toast && toast({ title: 'KYC on-chain ✓', msg: entry.wallet_address.slice(0,10) + '… habilitado en el contrato de la factory.', hash: hash }); })
-            .catch(function(e){ toast && toast({ type: 'warn', title: 'Registro on-chain pendiente', msg: ((e && e.message) || 'No se pudo firmar.') + ' Podés completarlo desde Emisión → PRE-GAT → Whitelist.' }); });
+            .catch(function(e){ toast && toast({ type: 'warn', title: 'Registro on-chain pendiente', msg: ((e && e.message) || 'No se pudo firmar.') + ' Podés completarlo desde Accesos → Whitelist on-chain o Proyecto GAT → Whitelist.' }); });
           return;
         }
         toast && toast({ title: action === 'approve' ? 'KYC aprobado' : 'KYC rechazado', msg: 'La verificación fue actualizada.' });
@@ -6551,6 +6569,15 @@ function AdminAccesos({ chain, toast }) {
     h('div', { className: 'eyebrow' }, 'Panel TOKAI · Administración de accesos'),
     h('h1', { className: 'page' }, 'Solicitudes y accesos'),
     h('p', { className: 'page-sub' }, 'Los emisores llegan a través del formulario de contacto. TOKAI evalúa, prepara la propuesta fuera de la plataforma, y habilita el acceso cuando hay acuerdo.'),
+
+    h('div', { className: 'card', style: { padding: '12px 14px', marginBottom: 16, borderLeft: '3px solid var(--emerald)' } },
+      h('div', { style: { fontWeight: 800, fontSize: 13, marginBottom: 4 } }, 'Flujo correcto: cliente -> acceso -> proyecto GAT'),
+      h('div', { style: { color: 'var(--txt-dim)', fontSize: 12, lineHeight: 1.55 } }, 'Primero se aprueba al emisor en Pendientes. Despues el cliente crea su proyecto GAT en el wizard. La whitelist, KYC, suscripciones y certificados PRE-GAT son controles del mismo proyecto, no un modulo separado.')
+    ),
+    (accessLoading || accessError) && h('div', { className: 'card', style: { padding: '10px 12px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, borderColor: accessError ? 'rgba(255,178,62,.35)' : 'rgba(0,214,126,.2)' } },
+      h('div', { style: { color: accessError ? '#FFB23E' : 'var(--txt-dim)', fontSize: 12 } }, accessLoading ? 'Cargando solicitudes reales del backend...' : accessError),
+      accessError && h('button', { className: 'btn btn-ghost btn-sm', onClick: function(){ loadSolicitudes(); } }, 'Reintentar')
+    ),
 
     /* KPIs */
     h('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 20 } },
@@ -6905,7 +6932,7 @@ async function preGATWhitelistOnChain(addr){
       await mm.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x89' }] });
     } catch(swErr) {
       if (swErr.code === 4902) {
-        await mm.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x89', chainName: 'Polygon PoS', nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 }, rpcUrls: [cfg.rpc], blockExplorerUrls: [cfg.explorer] }] });
+        await mm.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x89', chainName: 'Polygon PoS', nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 }, rpcUrls: [cfg.rpc, cfg.rpcFallback || cfg.rpc], blockExplorerUrls: [cfg.explorer] }] });
       } else throw swErr;
     }
   }
@@ -7014,7 +7041,7 @@ function usePreGAT(walletAddr) {
         await mm.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: '0x89' }] });
       } catch(swErr) {
         if (swErr.code === 4902) {
-          await mm.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x89', chainName: 'Polygon PoS', nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 }, rpcUrls: [cfg.rpc], blockExplorerUrls: [cfg.explorer] }] });
+          await mm.request({ method: 'wallet_addEthereumChain', params: [{ chainId: '0x89', chainName: 'Polygon PoS', nativeCurrency: { name: 'POL', symbol: 'POL', decimals: 18 }, rpcUrls: [cfg.rpc, cfg.rpcFallback || cfg.rpc], blockExplorerUrls: [cfg.explorer] }] });
         } else throw swErr;
       }
     }
@@ -7149,7 +7176,7 @@ function PreGATAdminPanel({ toast }) {
     setTxLoading(false);
   }
 
-  var tabs = [['dashboard','Dashboard'],['whitelist','Whitelist KYC'],['mint','Emisión'],['phase2','Fase 2']];
+  var tabs = [['dashboard','Dashboard'],['whitelist','Accesos on-chain'],['mint','Certificados'],['phase2','Canje GAT']];
 
   var pct = function(n, d){ return d > 0 ? ((n/d)*100).toFixed(1) : '0.0'; };
 
@@ -7157,13 +7184,18 @@ function PreGATAdminPanel({ toast }) {
     /* Header */
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 } },
       h('div', { style: { background: 'rgba(0,214,126,.12)', border: '1px solid rgba(0,214,126,.25)', borderRadius: 10, padding: '10px 14px' } },
-        h('div', { style: { fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--emerald)', letterSpacing: '.1em', marginBottom: 3 } }, 'PRE-GAT · POLYGON POS MAINNET'),
+        h('div', { style: { fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--emerald)', letterSpacing: '.1em', marginBottom: 3 } }, 'PROYECTO GAT · CERTIFICADOS PRE-GAT'),
         cfg && h('div', { style: { fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--txt-dim)' } },
           h('a', { href: explorerAddr(cfg.address), target: '_blank', rel: 'noopener noreferrer', style: { color: 'var(--emerald)', textDecoration: 'none' } }, cfg.address.slice(0,10)+'…'+cfg.address.slice(-6))
         )
       ),
       h('button', { className: 'btn btn-ghost btn-sm', onClick: pg.loadStatus, disabled: pg.loading }, pg.loading ? '…' : '↻ Actualizar'),
       pg.error && h('span', { style: { color: 'var(--red)', fontSize: 12 } }, pg.error)
+    ),
+
+    h('div', { className: 'card', style: { padding: '12px 14px', marginBottom: 16, borderLeft: '3px solid var(--emerald)' } },
+      h('div', { style: { fontWeight: 800, fontSize: 13, marginBottom: 4 } }, 'PRE-GAT es el certificado de preventa del proyecto GAT'),
+      h('div', { style: { color: 'var(--txt-dim)', fontSize: 12, lineHeight: 1.55 } }, 'Este panel no crea un proyecto aparte: registra wallets autorizadas, emite certificados de preventa y habilita el canje futuro hacia el GAT definitivo cuando el proyecto complete sus condiciones.')
     ),
 
     /* Tabs */
@@ -7656,7 +7688,7 @@ function App(){
   const nav = {
     investor:[['dash','Proyectos',I.proj],['portfolio','Mi cartera',I.wallet],['invest','Suscribir',I.invest],['market','Mercado secundario',I.market],['guide','Guía de uso',I.doc]],
     issuer:[['dash','Proyectos',I.proj],['admin','Administración',I.admin],['market','Mercado secundario',I.market],['guide','Guía de uso',I.doc]],
-    tokai:[['tokai','Supervisión',I.flask],['report-gen','Reporte Modelo',I.doc],['emission-engine','Motor de Emisión',I.zap],['emission-checklist','Checklist',I.shield],['admin','Emisión · PRE-GAT',I.zap],['thesis-editor','Tesis de Valor',I.doc],['dash','Proyectos',I.proj],['market','Mercado secundario',I.market],['guide','Guía de uso',I.doc]],
+    tokai:[['tokai','Supervisión',I.flask],['report-gen','Reporte Modelo',I.doc],['emission-engine','Motor de Emisión',I.zap],['emission-checklist','Checklist',I.shield],['admin','Proyecto GAT',I.zap],['thesis-editor','Tesis de Valor',I.doc],['dash','Proyectos',I.proj],['market','Mercado secundario',I.market],['guide','Guía de uso',I.doc]],
   }[role];
   const titles={dash:'Proyectos',asset:'Ficha del activo',invest:'Portal del inversor',portfolio:'Mi cartera',market:'Mercado secundario',tokai:'Panel TOKAI',admin:'Administración',guide:'Guía de uso','thesis-editor':'Tesis de Valor · TOKAI','thesis-client':'Tesis de Valor · Cliente','emission-engine':'Motor de Emisión','emission-checklist':'Checklist pre-emisión','report-gen':'Reporte del modelo'};
 
