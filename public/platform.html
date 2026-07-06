@@ -3547,13 +3547,13 @@ function HomeEmisor({chain, auth, go, wallet, connectWallet}){
   );
 }
 
-/* ── Catálogo de jurisdicciones para emisores multijurisdiccionales (v3.4.0) ── */
+/* ── Catálogo de jurisdicciones para emisores multijurisdiccionales (v3.5.0) ── */
 const ISSUER_JURISDICTIONS = {
-  AR: { label:'🇦🇷 Argentina',       regimes:{ calificados:'CNV · RG 1088 — Oferta privada (calificados)', todos:'CNV · RG 1069 — Oferta pública' }, kycOptions:['sumsub','ripio','lemon'],     defaultKyc:'sumsub', iso:32  },
-  CL: { label:'🇨🇱 Chile',           regimes:{ calificados:'CMF · Ley Fintech — Inversionistas calificados', todos:'CMF · Ley Fintech — Oferta general' }, kycOptions:['sumsub','onfido','metamap'], defaultKyc:'sumsub', iso:152 },
-  EU: { label:'🇪🇺 España / Europa', regimes:{ calificados:'MiCA · MiFID II — Inversores profesionales', todos:'MiCA · Retail — prospecto KIID requerido' }, kycOptions:['onfido','veriff','sumsub'],  defaultKyc:'onfido', iso:724 },
-  US: { label:'🇺🇸 Estados Unidos',  regimes:{ calificados:'SEC · Reg D 506(c) — Accredited Investors', todos:'SEC · Reg S — Non-US Persons' }, kycOptions:['persona','veriff','sumsub'],   defaultKyc:'persona', iso:840 },
-  AS: { label:'🌏 Asia-Pacífico',    regimes:{ calificados:'MAS (Singapur) · VASP — Institutional', todos:'MAS (Singapur) · VASP — Retail licence' }, kycOptions:['sumsub','veriff'],            defaultKyc:'sumsub', iso:702 },
+  AR: { label:'🇦🇷 Argentina',       regimes:{ calificados:'CNV · RG 1088 — Oferta privada (calificados)', todos:'CNV · RG 1069 — Oferta pública' }, kycOptions:['sumsub','ripio','lemon'],     defaultKyc:'sumsub', iso:32,  compositeEmission:true },
+  CL: { label:'🇨🇱 Chile',           regimes:{ calificados:'CMF · Ley Fintech — Inversionistas calificados', todos:'CMF · Ley Fintech — Oferta general' }, kycOptions:['sumsub','onfido','metamap'], defaultKyc:'sumsub', iso:152, compositeEmission:true },
+  EU: { label:'🇪🇺 España / Europa', regimes:{ calificados:'MiCA · MiFID II — Inversores profesionales', todos:'MiCA · Retail — prospecto KIID requerido' }, kycOptions:['onfido','veriff','sumsub'],  defaultKyc:'onfido', iso:724, compositeEmission:true },
+  US: { label:'🇺🇸 Estados Unidos',  regimes:{ calificados:'SEC · Reg D 506(c) — Accredited Investors', todos:'SEC · Reg S — Non-US Persons' }, kycOptions:['persona','veriff','sumsub'],   defaultKyc:'persona', iso:840, compositeEmission:true },
+  AS: { label:'🌏 Asia-Pacífico',    regimes:{ calificados:'MAS (Singapur) · VASP — Institutional', todos:'MAS (Singapur) · VASP — Retail licence' }, kycOptions:['sumsub','veriff'],            defaultKyc:'sumsub', iso:702, compositeEmission:true },
 };
 const KYC_PROVIDERS = {
   sumsub:  { label:'Sumsub',          flag:'🌍', desc:'Biometría + liveness global. Recomendado para LATAM.' },
@@ -3633,10 +3633,23 @@ function WizardCrear({chain, toast, go}){
     const soulbound = f.kind==='club' || !!strategy.soulbound;
     const jurCfg = (ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR']);
     const regDerived = jurCfg.regimes[f.audience] || jurCfg.regimes['calificados'] || strategy.regime || 'Regimen regulado';
+    // isComposite = cualquier jurisdiccion en oferta publica con flag compositeEmission
+    // isRg1069   = especifico de Argentina (solo afecta naming y architecture key)
     const isRg1069 = f.issuerJurisdiction === 'AR' && f.audience === 'todos';
-    const emissionStack = isRg1069 ? [
-      { stage: 1, key: 'pregat', symbol: 'PRE-' + symbol, standard: 'ERC-721', role: 'certificado_soulbound', label: 'Certificado soulbound de preventa', status: 'operable', jurisdiction: f.issuerJurisdiction, regime: regDerived },
-      { stage: 2, key: 'gat', symbol: symbol, standard: 'ERC-3643', role: 'token_definitivo', label: 'Token definitivo regulado', status: 'pendiente_factory', jurisdiction: f.issuerJurisdiction, regime: regDerived }
+    const isComposite = !!jurCfg.compositeEmission && f.audience === 'todos';
+    const emissionStack = isComposite ? [
+      { stage: 1, key: isRg1069 ? 'pregat' : 'soulbound',
+        symbol: 'PRE-' + symbol,
+        standard: 'ERC-721',
+        role: 'certificado_soulbound',
+        label: isRg1069 ? 'Certificado soulbound de preventa' : 'Certificado soulbound · Etapa 1',
+        status: 'operable', jurisdiction: f.issuerJurisdiction, regime: regDerived },
+      { stage: 2, key: isRg1069 ? 'gat' : 'token',
+        symbol: symbol,
+        standard: 'ERC-3643',
+        role: 'token_definitivo',
+        label: isRg1069 ? 'Token definitivo regulado' : 'Token regulado · Etapa 2 (' + jurCfg.label + ')',
+        status: 'pendiente_factory', jurisdiction: f.issuerJurisdiction, regime: regDerived }
     ] : [
       { stage: 1, key: 'primary', symbol: symbol, standard: f.tokenStandard || 'ERC-3643', role: 'emision_primaria', label: strategy.label || 'Instrumento primario', status: 'operable', jurisdiction: f.issuerJurisdiction, regime: regDerived }
     ];
@@ -3668,7 +3681,7 @@ function WizardCrear({chain, toast, go}){
         compliance: f.complianceAddress || '',
       },
       complianceRules: strategy.complianceRules || {},
-      meta: { emissionStack: emissionStack, emissionArchitecture: isRg1069 ? 'composite_1069_pregat_to_gat' : 'single_instrument' },
+      meta: { emissionStack: emissionStack, emissionArchitecture: isRg1069 ? 'composite_1069_pregat_to_gat' : isComposite ? 'composite_local_soulbound_to_token' : 'single_instrument' },
       phaseState: { phase: 1, phase2_active: false, emission_stack: emissionStack },
     };
     if(chain.createProject){ chain.createProject(cfg); toast&&toast({title:'¡Proyecto creado!',msg:f.name+' quedó listo para configurar y emitir.'}); go('admin'); }
@@ -7276,12 +7289,23 @@ function PreGATAdminPanel({ toast, chain, project }) {
 
     h('div', { className: 'card', style: { padding: '12px 14px', marginBottom: 16, borderLeft: '3px solid var(--emerald)' } },
       h('div', { style: { fontWeight: 800, fontSize: 13, marginBottom: 4 } }, projectLabel(selectedProject)),
-      h('div', { style: { color: 'var(--txt-dim)', fontSize: 12, lineHeight: 1.55 } }, 'PRE-GAT es la etapa 1 del Proyecto GAT: registra wallets autorizadas y emite certificados de preventa. GAT definitivo es la etapa 2: el canje quema el certificado y habilita la entrega del instrumento final.')
+      h('div', { style: { color: 'var(--txt-dim)', fontSize: 12, lineHeight: 1.55 } },
+        (function(){
+          var arch = selectedProject && selectedProject.meta && selectedProject.meta.emissionArchitecture;
+          var stg1 = emissionStack[0] && emissionStack[0].symbol;
+          var stg2 = emissionStack[1] && emissionStack[1].symbol;
+          if(arch === 'composite_1069_pregat_to_gat')
+            return stg1 + ' es la etapa 1: registra wallets autorizadas y emite certificados de preventa (RG 1069). ' + (stg2||'GAT') + ' es la etapa 2: el canje quema el certificado y entrega el instrumento final regulado por CNV.';
+          if(arch === 'composite_local_soulbound_to_token' || (emissionStack.length > 1))
+            return (stg1||'Soulbound') + ' es la etapa 1: certificado soulbound de preventa y whitelist para la jurisdicción del emisor. ' + (stg2||'Token') + ' es la etapa 2: token regulado bajo la normativa local. El canje quema el certificado.';
+          return 'Instrumento único. El contrato gestiona la emisión, los derechos económicos y las reglas de compliance directamente.';
+        })()
+      )
     ),
 
     h('div', { className:'grid', style:{gridTemplateColumns:'repeat(2,minmax(0,1fr))',gap:12,marginBottom:16} },
       emissionStack.map(function(ins){
-        var active = ins.key === 'pregat' || ins.status === 'desplegado' || ins.status === 'operable';
+        var active = ins.key === 'pregat' || ins.key === 'soulbound' || ins.status === 'desplegado' || ins.status === 'operable';
         var reqs = ins.standard === 'ERC-721'
           ? ['Wallet en whitelist', 'KYC/KYB off-chain aprobado', 'Soulbound sin transferencia', 'Terminos de canje definidos']
           : ['Identity Registry/KYC on-chain', 'Reglas de jurisdiccion y lock-up', 'Topes de holders/oferta', 'Deploy por TokenFactory con ProjectDeployed'];
