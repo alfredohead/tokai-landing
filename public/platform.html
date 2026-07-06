@@ -3647,8 +3647,8 @@ function WizardCrear({chain, toast, go}){
       supplyMax: f.kind==='club'? 500 : (Number(f.tokens)||0),
       priceUsd: f.kind==='club'? 0 : Math.round(price),
       coverImage:f.coverImage, gallery:f.gallery, photoSeals:f.photoSeals||[],
-      regime: (ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR']).regimes[f.audience] || strategy.regime || (f.audience==='todos' ? 'RG 1069' : 'RG 1088'),
-      regimeLabel: (ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR']).regimes[f.audience] || (f.audience==='todos' ? 'Oferta pública (RG 1069)' : 'Oferta privada · calificados (RG 1088)'),
+      regime: (ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR']).regimes[f.audience] || strategy.regime || (f.audience==='todos' ? 'Oferta pública' : 'Oferta privada · calificados'),
+      regimeLabel: (ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR']).regimes[f.audience] || (f.audience==='todos' ? 'Oferta pública' : 'Oferta privada · calificados'),
       issuerJurisdiction: f.issuerJurisdiction || 'AR',
       kycProvider: f.kycProvider || 'sumsub',
       jurisdictions:[jurCfg.iso], lockupDays: f.audience==='todos'?0:180, soulbound, maxHolders: f.audience==='todos'?0:50,
@@ -7262,7 +7262,7 @@ function PreGATAdminPanel({ toast, chain, project }) {
     /* Header */
     h('div', { style: { display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18 } },
       h('div', { style: { background: 'rgba(0,214,126,.12)', border: '1px solid rgba(0,214,126,.25)', borderRadius: 10, padding: '10px 14px' } },
-        h('div', { style: { fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--emerald)', letterSpacing: '.1em', marginBottom: 3 } }, 'INSTRUMENTO · CERTIFICADOS PRE-GAT'),
+        h('div', { style: { fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--emerald)', letterSpacing: '.1em', marginBottom: 3 } }, 'INSTRUMENTO · ' + ((emissionStack[0] && emissionStack[0].symbol) || 'PRE-GAT')),
         cfg && h('div', { style: { fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--txt-dim)' } },
           h('a', { href: explorerAddr(cfg.address), target: '_blank', rel: 'noopener noreferrer', style: { color: 'var(--emerald)', textDecoration: 'none' } }, cfg.address.slice(0,10)+'…'+cfg.address.slice(-6))
         )
