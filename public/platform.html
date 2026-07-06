@@ -2759,6 +2759,184 @@ const RONDAS = ['Clasificación','Análisis Financiero','Legal / Regulatorio','D
    CapTableView — Registro real de tenedores (cap table on-chain)
    Derivado de los eventos indexados del contrato PRE-GAT por el backend.
    ════════════════════════════════════════════════════════════════════ */
+function AdminContractsConfig({toast}) {
+  var API = window.__API_URL__ || '';
+  var [cfg, setCfg] = useState({
+    network: 'amoy',
+    chainId: 80002,
+    usdc: '',
+    identityRegistry: '',
+    priceOracle: '',
+    otcMarket: '',
+    tokenFactory: '',
+    timelockController: '',
+    factories: {
+      erc3643: '',
+      erc4626: '',
+      erc7540: '',
+      erc1155: '',
+      erc5192: ''
+    }
+  });
+  var [loading, setLoading] = useState(false);
+  var [saving, setSaving] = useState(false);
+
+  function load() {
+    if (!API) return;
+    setLoading(true);
+    fetch(API + '/admin/contracts-config', { credentials: 'include' })
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
+      .then(function(data) {
+        if (data && data.config) {
+          setCfg(data.config);
+        }
+      })
+      .catch(function() {
+        toast && toast({ type: 'warn', title: 'Sin configuración', msg: 'No se encontró configuración previa en la base de datos.' });
+      })
+      .finally(function(){ setLoading(false); });
+  }
+
+  useEffect(function() {
+    load();
+  }, []);
+
+  function save() {
+    if (!API) return;
+    if (!cfg.network || !cfg.tokenFactory) {
+      toast && toast({ type: 'err', title: 'Error', msg: 'Red y TokenFactory son requeridos.' });
+      return;
+    }
+    setSaving(true);
+    fetch(API + '/admin/contracts-config', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cfg)
+    })
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
+      .then(function() {
+        toast && toast({ title: 'Configuración guardada', msg: 'Los contratos inteligentes se actualizaron en la plataforma.' });
+      })
+      .catch(function() {
+        toast && toast({ type: 'err', title: 'Error al guardar', msg: 'No se pudo guardar la configuración.' });
+      })
+      .finally(function(){ setSaving(false); });
+  }
+
+  function loadDefaults(preset) {
+    var PRESETS = {
+      amoy: {
+        network: 'amoy',
+        chainId: 80002,
+        usdc: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
+        identityRegistry: '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512',
+        priceOracle: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0',
+        otcMarket: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9',
+        tokenFactory: '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9',
+        timelockController: '',
+        factories: {
+          erc3643: '0x5FC8d32690cc91D4c39d9d3abcBD16989F875707',
+          erc4626: '0x0165878A594ca255338adfa4d48449f69242Eb8F',
+          erc7540: '0xa513E6E4b8f2a923D98304ec87F64353C4D5C853',
+          erc1155: '0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6',
+          erc5192: '0x8A791620dd6260079BF849Dc5567aDC3F2FdC318'
+        }
+      },
+      mainnet: {
+        network: 'mainnet',
+        chainId: 137,
+        usdc: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
+        identityRegistry: '',
+        priceOracle: '',
+        otcMarket: '',
+        tokenFactory: '',
+        timelockController: '',
+        factories: {
+          erc3643: '',
+          erc4626: '',
+          erc7540: '',
+          erc1155: '',
+          erc5192: ''
+        }
+      }
+    };
+    if (PRESETS[preset]) {
+      setCfg(PRESETS[preset]);
+      toast && toast({ title: 'Valores cargados', msg: 'Se cargaron los valores sugeridos para ' + preset + '. Guardalos para aplicar.' });
+    }
+  }
+
+  var inp = { width: '100%', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line-solid)', background: 'var(--black)', color: 'var(--txt)', fontSize: 12, fontFamily: 'var(--mono)' };
+  var labelStyle = { display: 'block', fontSize: 11, color: 'var(--txt-dim)', marginBottom: 4, fontWeight: 600 };
+
+  return h('div', { className: 'card' },
+    h('div', { className: 'between', style: { marginBottom: 16 } },
+      h('div', {},
+        h('h3', { style: { fontSize: 15, fontWeight: 700, margin: 0 } }, 'Gestión de Contratos Inteligentes'),
+        h('div', { style: { fontSize: 12, color: 'var(--txt-mute)', marginTop: 3 } }, 'Configurá los contratos del protocolo para operar en vivo (Polygon mainnet o testnet) sin tocar el código.')
+      ),
+      h('div', { style: { display: 'flex', gap: 6 } },
+        h('button', { className: 'btn btn-ghost btn-sm', onClick: function(){ loadDefaults('amoy'); } }, 'Cargar Amoy (Testnet)'),
+        h('button', { className: 'btn btn-ghost btn-sm', onClick: function(){ loadDefaults('mainnet'); } }, 'Cargar Mainnet Base')
+      )
+    ),
+    h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 } },
+      h('div', {},
+        h('label', { style: labelStyle }, 'Nombre de Red'),
+        h('input', { style: inp, value: cfg.network, onChange: function(e){ setCfg(Object.assign({}, cfg, { network: e.target.value })); } })),
+      h('div', {},
+        h('label', { style: labelStyle }, 'Chain ID (Número)'),
+        h('input', { type: 'number', style: inp, value: cfg.chainId, onChange: function(e){ setCfg(Object.assign({}, cfg, { chainId: Number(e.target.value) })); } }))
+    ),
+    h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 } },
+      h('div', {},
+        h('label', { style: labelStyle }, 'USDC Token Address'),
+        h('input', { style: inp, value: cfg.usdc || '', onChange: function(e){ setCfg(Object.assign({}, cfg, { usdc: e.target.value })); } })),
+      h('div', {},
+        h('label', { style: labelStyle }, 'IdentityRegistry Address'),
+        h('input', { style: inp, value: cfg.identityRegistry || '', onChange: function(e){ setCfg(Object.assign({}, cfg, { identityRegistry: e.target.value })); } }))
+    ),
+    h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 } },
+      h('div', {},
+        h('label', { style: labelStyle }, 'PriceOracle Address'),
+        h('input', { style: inp, value: cfg.priceOracle || '', onChange: function(e){ setCfg(Object.assign({}, cfg, { priceOracle: e.target.value })); } })),
+      h('div', {},
+        h('label', { style: labelStyle }, 'OTCMarket Address'),
+        h('input', { style: inp, value: cfg.otcMarket || '', onChange: function(e){ setCfg(Object.assign({}, cfg, { otcMarket: e.target.value })); } }))
+    ),
+    h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 } },
+      h('div', {},
+        h('label', { style: labelStyle }, 'TokenFactory Address'),
+        h('input', { style: inp, value: cfg.tokenFactory || '', onChange: function(e){ setCfg(Object.assign({}, cfg, { tokenFactory: e.target.value })); } })),
+      h('div', {},
+        h('label', { style: labelStyle }, 'TimelockController Address'),
+        h('input', { style: inp, value: cfg.timelockController || '', onChange: function(e){ setCfg(Object.assign({}, cfg, { timelockController: e.target.value })); } }))
+    ),
+    h('div', { style: { fontWeight: 700, fontSize: 12, borderTop: '1px solid var(--line-solid)', paddingTop: 14, marginTop: 8, marginBottom: 10, color: 'var(--txt-mute)' } }, 'DIRECCIONES DE FACTORIES COMPLEMENTARIAS'),
+    h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 } },
+      h('div', {},
+        h('label', { style: labelStyle }, 'ERC-3643 Factory'),
+        h('input', { style: inp, value: (cfg.factories && cfg.factories.erc3643) || '', onChange: function(e){ setCfg(Object.assign({}, cfg, { factories: Object.assign({}, cfg.factories, { erc3643: e.target.value }) })); } })),
+      h('div', {},
+        h('label', { style: labelStyle }, 'ERC-4626 Factory'),
+        h('input', { style: inp, value: (cfg.factories && cfg.factories.erc4626) || '', onChange: function(e){ setCfg(Object.assign({}, cfg, { factories: Object.assign({}, cfg.factories, { erc4626: e.target.value }) })); } }))
+    ),
+    h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 20 } },
+      h('div', {},
+        h('label', { style: labelStyle }, 'ERC-7540 Factory'),
+        h('input', { style: inp, value: (cfg.factories && cfg.factories.erc7540) || '', onChange: function(e){ setCfg(Object.assign({}, cfg, { factories: Object.assign({}, cfg.factories, { erc7540: e.target.value }) })); } })),
+      h('div', {},
+        h('label', { style: labelStyle }, 'ERC-1155 Factory'),
+        h('input', { style: inp, value: (cfg.factories && cfg.factories.erc1155) || '', onChange: function(e){ setCfg(Object.assign({}, cfg, { factories: Object.assign({}, cfg.factories, { erc1155: e.target.value }) })); } })),
+      h('div', {},
+        h('label', { style: labelStyle }, 'ERC-5192 Factory'),
+        h('input', { style: inp, value: (cfg.factories && cfg.factories.erc5192) || '', onChange: function(e){ setCfg(Object.assign({}, cfg, { factories: Object.assign({}, cfg.factories, { erc5192: e.target.value }) })); } }))
+    ),
+    h('button', { className: 'btn btn-primary', disabled: saving || loading, onClick: save }, saving ? 'Guardando…' : '✓ Guardar Configuración')
+  );
+}
+
 function CapTableView({toast, chain}){
   var API = window.__API_URL__ || '';
   var projects = (chain && chain.projects) || [];
@@ -2867,7 +3045,7 @@ function TokaiView({chain,toast,subView,go}){
   }).length;
 
   var pagosPend = (chain.solicitudes||[]).filter(function(s){return s.status==='pending';}).length;
-  const TABS=[{k:'dashboard',l:'Dashboard'},{k:'psav',l:'PSAV'+(psavPendiente>0?' ⚠'+psavPendiente:'')},{k:'kyc',l:'Identidades'},{k:'checklist',l:'Checklist'},{k:'geofencing',l:'Geofencing'},{k:'accesos',l:'Accesos'+(pagosPend>0?' ⚠'+pagosPend:'')},{k:'captable',l:'Cap Table'}];
+  const TABS=[{k:'dashboard',l:'Dashboard'},{k:'psav',l:'PSAV'+(psavPendiente>0?' ⚠'+psavPendiente:'')},{k:'kyc',l:'Identidades'},{k:'checklist',l:'Checklist'},{k:'geofencing',l:'Geofencing'},{k:'accesos',l:'Accesos'+(pagosPend>0?' ⚠'+pagosPend:'')},{k:'captable',l:'Cap Table'},{k:'contracts',l:'Contratos'}];
 
   return h('div',{},
     h('div',{className:'eyebrow'},'Laboratorio · supervisión'),
@@ -2960,6 +3138,7 @@ function TokaiView({chain,toast,subView,go}){
     tab==='accesos'   && h(AdminAccesos, {chain,toast}),
     tab==='instrumentos' && h(PreGATAdminPanel,{toast, chain, project: findGATProject(chain.projects)}),
     tab==='captable'  && h(CapTableView, {toast, chain}),
+    tab==='contracts' && h(AdminContractsConfig, {toast}),
     tab==='geofencing' && h(AdminGeofencing, {chain,toast}),
     tab==='thesis-editor' && h(ThesisFlexEditor, {chain,toast,go}),
     tab==='report-gen' && h(ReportExporter, {chain,toast}),
@@ -7588,7 +7767,26 @@ function App(){
     return localStorage.getItem('tokai_live_mode') || 'real';
   });
 
+  const [deployment, setDeployment] = useState(function(){
+    return (typeof window !== 'undefined') ? window.__DEPLOYMENT__ : null;
+  });
+
   const apiUrl = window.__API_URL__ || '';
+
+  useEffect(function() {
+    if (apiUrl) {
+      fetch(apiUrl + '/contracts')
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+        .then(function(data) {
+          if (data && data.configured && data.deployment) {
+            window.__DEPLOYMENT__ = data.deployment;
+            setDeployment(data.deployment);
+          }
+        })
+        .catch(function() {});
+    }
+  }, [apiUrl]);
+
   const sim = useChain({apiUrl, loggedIn: !!auth});
   const web3 = (typeof useWeb3==='function') ? useWeb3() : { available:false };
   const live = (typeof useChainWeb3==='function') ? useChainWeb3(web3.account) : null;
