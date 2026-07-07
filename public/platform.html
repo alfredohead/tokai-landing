@@ -242,7 +242,38 @@ window.TOKEN_STRATEGIES = {
    Nota: producción usa el endpoint Fly.io directo (el custom domain api.tokairwa.com
    queda pendiente de verificación DNS completa). */
 window.__API_URL__ = '/api/v1';
-window.__TOKAI_ENABLE_LIVE_MODE__ = window.__TOKAI_ENABLE_LIVE_MODE__ !== false;</script><script type="text/babel" data-presets="react">/* ════════════════════════════════════════════════════════════════════
+window.__TOKAI_ENABLE_LIVE_MODE__ = window.__TOKAI_ENABLE_LIVE_MODE__ !== false;
+
+/* Interceptor global de fetch para inyectar token JWT */
+(function() {
+  const originalFetch = window.fetch;
+  window.fetch = function(input, init) {
+    const token = localStorage.getItem('tokai_jwt');
+    const isStringUrl = typeof input === 'string';
+    const isRequestObjUrl = input && typeof input === 'object' && typeof input.url === 'string';
+    const urlStr = isStringUrl ? input : (isRequestObjUrl ? input.url : '');
+    
+    if (token && urlStr && (urlStr.includes('/api/v1') || (window.__API_URL__ && urlStr.includes(window.__API_URL__)))) {
+      init = init || {};
+      init.headers = init.headers || {};
+      if (init.headers instanceof Headers) {
+        if (!init.headers.has('Authorization')) {
+          init.headers.set('Authorization', 'Bearer ' + token);
+        }
+      } else if (Array.isArray(init.headers)) {
+        const hasAuth = init.headers.some(function(h) { return h[0].toLowerCase() === 'authorization'; });
+        if (!hasAuth) {
+          init.headers.push(['Authorization', 'Bearer ' + token]);
+        }
+      } else {
+        if (!init.headers['Authorization'] && !init.headers['authorization']) {
+          init.headers['Authorization'] = 'Bearer ' + token;
+        }
+      }
+    }
+    return originalFetch(input, init);
+  };
+})();</script><script type="text/babel" data-presets="react">/* ════════════════════════════════════════════════════════════════════
    TOKAI Platform — MVP demostrable
    Motor de simulación que REFLEJA EXACTAMENTE la lógica de los contratos
    ERC-3643 ya compilados y testeados (9/9 tests EVM pasando).
@@ -3477,11 +3508,17 @@ function LoginGate({onLogin, web3, toast}){
       try {
         const res = await fetch(window.__API_URL__ + '/auth/otp/verify', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-Auth-Fallback': 'true'
+          },
           body: JSON.stringify({ email: v, code: otp.trim() }),
         });
         const data = await res.json();
         if(!res.ok) { setError(data.message || 'Código incorrecto.'); setSending(false); return; }
+        if (data.token) {
+          localStorage.setItem('tokai_jwt', data.token);
+        }
         setSending(false);
         setError('');
         const backendRole = data.user.role;
@@ -7977,7 +8014,9 @@ function App(){
       if(isAdmin){ setRole('tokai'); setUiMode('expert'); setView('tokai'); }
       else if(approved){ setRole('issuer'); setUiMode('simple'); setView('home'); setPaid(true); }
       else { setRole('issuer'); setUiMode('simple'); setView('home'); setPaid(false); }
-    }).catch(()=>{}); // sin sesión activa
+    }).catch(()=>{
+      localStorage.removeItem('tokai_jwt');
+    }); // sin sesión activa
   },[]);
 
   if(!auth) return h(LoginGate,{onLogin:(a)=>{
@@ -8045,7 +8084,11 @@ function App(){
               h('button',{className:'role-btn active',onClick:()=>switchMode('simple')},'Simple'),
               h('button',{className:'role-btn',onClick:()=>switchMode('expert')},'Experto')),
             h('div',{className:'wallet-chip'},h('span',{className:'dot'}),auth.label||short(wallet.addr)),
-            h('button',{className:'btn btn-ghost btn-sm',onClick:async()=>{ if(window.__API_URL__) await fetch(window.__API_URL__+'/auth/logout',{method:'POST',credentials:'include'}).catch(()=>{}); setAuth(null);setView('home'); }},'Salir'))
+            h('button',{className:'btn btn-ghost btn-sm',onClick:async()=>{ 
+              if(window.__API_URL__) await fetch(window.__API_URL__+'/auth/logout',{method:'POST',credentials:'include'}).catch(()=>{}); 
+              localStorage.removeItem('tokai_jwt');
+              setAuth(null);setView('home'); 
+            }},'Salir'))
         ),
         h('div',{className:'content'},
           view==='home'&&h(HomeEmisor,{chain,auth,go,wallet,connectWallet:()=>web3.connect&&web3.connect()}),
