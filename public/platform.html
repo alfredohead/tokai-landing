@@ -286,7 +286,21 @@ const JUR = { 32:'🇦🇷 Argentina', 840:'🇺🇸 Estados Unidos', 724:'🇪�
 const CAT = { 1:'Retail', 2:'Calificado', 3:'Institucional' };
 
 /* ─── Estado inicial de la cadena (refleja deployment-amoy.json) ─── */
-function genAddr(seed){ let s=0; for(const c of seed) s=(s*31+c.charCodeAt(0))>>>0; let hex=''; for(let i=0;i<40;i++){ s=(s*1103515245+12345)>>>0; hex+=(s%16).toString(16);} return '0x'+hex; }
+/* Genera una address determinística y bien distribuida a partir de un seed.
+   IMPORTANTE: usa Math.imul + mulberry32. La versión previa hacía s*1103515245
+   con multiplicación en punto flotante: al superar 2^53 los bits bajos se
+   perdían y s%16 daba 0 casi siempre → TODAS las wallets colapsaban a
+   0x0000…0000 (admin e inversores compartían identidad). Como el inversor se
+   valida por su wallet, esa colisión rompía KYC, balances y mercado. */
+function genAddr(seed){
+  seed = String(seed);
+  let h = 1779033703 ^ seed.length;
+  for(let i=0;i<seed.length;i++){ h = Math.imul(h ^ seed.charCodeAt(i), 3432918353); h = (h<<13)|(h>>>19); }
+  let a = h>>>0;
+  function rnd(){ a|=0; a=(a+0x6D2B79F5)|0; let t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0); }
+  let hex=''; for(let i=0;i<40;i++){ hex += (rnd()&15).toString(16); }
+  return '0x'+hex;
+}
 
 /* ─── Mapeo backend (snake_case) → frontend (camelCase) ─── */
 function mapBackendProject(p){
@@ -505,9 +519,12 @@ function useChain(opts){
   const log = (ev, detail) => setEvents(e=>[{ev,detail,t:Date.now(),hash:txHash()},...e].slice(0,200));
 
   /* ── IdentityRegistry.registerIdentity ── */
-  function registerIdentity(addr, jur, cat){
-    setIdentities(s=>({...s,[addr]:{verified:true,jur,cat,verifiedAt:Date.now(),hash:txHash().slice(0,18)}}));
+  function registerIdentity(addr, jur, cat, claimHash, provider){
+    setIdentities(s=>({...s,[addr]:{verified:true,jur,cat,verifiedAt:Date.now(),hash:(claimHash||txHash()).slice(0,18),provider:provider||null}}));
     log('IdentityRegistered', `${short(addr)} · ${JUR[jur]} · ${CAT[cat]}`);
+    /* KycGate espera {ok:true} para avanzar; sin este return el flujo demo se
+       quedaba en "Error al registrar on-chain" y el KYC no llevaba a ningún lado. */
+    return {ok:true, hash:claimHash||null};
   }
   function revokeIdentity(addr){
     setIdentities(s=>({...s,[addr]:{...s[addr],verified:false}}));
@@ -7848,7 +7865,11 @@ function App(){
   const [sidebarOpen,setSidebarOpen] = useState(false);
   const [liveMode,setLiveMode] = useState(function(){
     if(typeof window === 'undefined' || window.__TOKAI_ENABLE_LIVE_MODE__ === false) return 'demo';
-    return localStorage.getItem('tokai_live_mode') || 'real';
+    /* Default 'demo' para que el panel del inversor sea plenamente operativo sin
+       MetaMask. Antes arrancaba en 'real' → sin wallet caía en "REAL PREVENTA"
+       con address 0x0000 y chain real vacío ("se traba / hay que reingresar").
+       Real sigue a un click y se usa on-chain al conectar wallet. */
+    return localStorage.getItem('tokai_live_mode') || 'demo';
   });
 
   const [deployment, setDeployment] = useState(function(){
