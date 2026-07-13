@@ -1826,7 +1826,7 @@ function AdminView({chain,wallet,toast,subView}){
     h('h1',{className:'page'},'Administración'),
     h('p',{className:'page-sub'},'Gestión de proyectos, emisión primaria, distribución de yield, identidades y contenido de pitch para inversores.'),
     !subView && h('div',{className:'role-switch',style:{marginBottom:22,width:'fit-content'}},
-      [['projects','Proyectos'],['pitch','Pitch del emisor'],['emission','Estado emisión'],['mint','Emisión'],['yield','Yield'],['kyc','Identidades'],['pregat','Instrumentos · PRE-GAT']].map(([k,l])=>
+      [['projects','Proyectos'],['pitch','Pitch del emisor'],['emission','Estado emisión'],['mint','Emisión'],['yield','Yield'],['kyc','Identidades']].map(([k,l])=>
         h('button',{key:k,className:'role-btn '+(tab===k?'active':''),onClick:()=>setTabState(k)},l))),
     tab==='projects'&&h(AdminProjects,{chain,toast}),
     tab==='pitch'&&h(AdminPitch,{chain,toast}),
@@ -1834,7 +1834,6 @@ function AdminView({chain,wallet,toast,subView}){
     tab==='mint'&&h(AdminMint,{chain,toast}),
     tab==='yield'&&h(AdminYield,{chain,toast}),
     tab==='kyc'&&h(AdminKycDual,{chain,toast}),
-    tab==='pregat'&&h(PreGATAdminPanel,{toast}),
   );
 }
 
@@ -8000,7 +7999,7 @@ function App(){
       target = allowedTokaiViews.includes(view) ? view : 'tokai';
     }
     else if(role==='issuer') target = view==='guide'?'guide':(['invest','portfolio','asset'].includes(view)?'admin':(view==='tokai'?'admin':view));
-    else target = view==='guide'?'guide':(['admin','tokai'].includes(view)?'dash':view);
+    else target = view==='guide'?'guide':(['admin','tokai','home','wizard','pagos','thesis-client','thesis-editor','emission-engine','emission-checklist','report-gen'].includes(view)?'dash':view);
     
     if (target !== view) {
       go(target, activeProject);
@@ -8066,7 +8065,7 @@ function App(){
 
   if(uiMode==='simple'){
     const simpleTitles={home:'Inicio',wizard:'Crear proyecto',admin:'Mis proyectos',asset:'Mi proyecto',guide:'Cómo funciona',market:'Mercado',dash:'Proyectos','thesis-client':'Tesis de Valor','thesis-editor':'Tesis de Valor',pagos:'Pagos'};
-    const simpleNav=[['home','Inicio','M3 12l9-9 9 9M5 10v10h14V10'],['admin','Mis proyectos','M3 7h18M3 12h18M3 17h18'],['thesis-client','Tesis de valor','M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'],['pagos','Pagos','M2 7h20v10H2zM2 11h20'],['guide','Cómo funciona','M12 17v.01M12 13a2 2 0 10-2-2'],['dash','Ver como inversor','M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z']];
+    const simpleNav=[['home','Inicio','M3 12l9-9 9 9M5 10v10h14V10'],['admin','Mis proyectos','M3 7h18M3 12h18M3 17h18'],['thesis-client','Tesis de valor','M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'],['pagos','Pagos','M2 7h20v10H2zM2 11h20'],['market','Mercado secundario','M3 3v18h18M7 16l4-4 4 4 5-6'],['guide','Cómo funciona','M12 17v.01M12 13a2 2 0 10-2-2'],['dash','Ver como inversor','M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z']];
     return h('div',{className:'app'},
       h('div',{className:'sidebar'+(sidebarOpen?' open':'')},
         h('a',{href:'/',className:'brand',style:{textDecoration:'none',color:'inherit'}},
@@ -8087,7 +8086,7 @@ function App(){
             h(Icon,{d:icon}),label)),
           h('div',{style:{flex:1}})),
         h('div',{className:'sidebar-foot'},
-          h('span',{className:'net-dot'}),'Modo simple',h('br'),
+          h('span',{className:'net-dot'}),'Panel del emisor',h('br'),
           h('span',{style:{color:'var(--txt-mute)',opacity:.7}},'TOKAI estructura · nunca es PSAV'))
       ),
       sidebarOpen&&h('div',{onClick:()=>setSidebarOpen(false),style:{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:80}}),
@@ -8101,9 +8100,6 @@ function App(){
             liveModeEnabled&&h('div',{className:'role-switch'},
               h('button',{className:'role-btn'+(!isReal?' active':''),onClick:()=>setMode('demo')},'Demo'),
               h('button',{className:'role-btn'+(isReal?' active':''),onClick:()=>setMode('real')},'Real')),
-            h('div',{className:'role-switch'},
-              h('button',{className:'role-btn active',onClick:()=>switchMode('simple')},'Simple'),
-              h('button',{className:'role-btn',onClick:()=>switchMode('expert')},'Experto')),
             h('div',{className:'wallet-chip'},h('span',{className:'dot'}),auth.label||short(wallet.addr)),
             h('button',{className:'btn btn-ghost btn-sm',onClick:async()=>{ 
               if(window.__API_URL__) await fetch(window.__API_URL__+'/auth/logout',{method:'POST',credentials:'include'}).catch(()=>{}); 
@@ -8220,12 +8216,9 @@ function App(){
           liveModeEnabled&&h('div',{className:'role-switch'},
             h('button',{className:'role-btn'+(!isReal?' active':''),onClick:()=>setMode('demo')},'Demo'),
             h('button',{className:'role-btn'+(isReal?' active':''),onClick:()=>setMode('real')},'Real')),
-          role==='issuer'&&h('div',{className:'role-switch'},
-            h('button',{className:'role-btn',onClick:()=>switchMode('simple')},'Simple'),
-            h('button',{className:'role-btn active',onClick:()=>switchMode('expert')},'Experto')),
           h('div',{className:'role-switch'},
             h('button',{className:'role-btn'+(role==='investor'?' active':''),onClick:()=>activateRole('investor')},'Inversor'),
-            canAccessRole('issuer')&&h('button',{className:'role-btn'+(role==='issuer'?' active':''),onClick:()=>activateRole('issuer')},'Emisor'),
+            canAccessRole('issuer')&&h('button',{className:'role-btn'+(role==='issuer'?' active':''),onClick:()=>{ if(activateRole('issuer')) switchMode('simple'); }},'Emisor'),
             canAccessRole('tokai')&&h('button',{className:'role-btn'+(role==='tokai'?' active':''),onClick:()=>activateRole('tokai')},'TOKAI')),
           role==='investor'&&h('select',{value:walletIdx,onChange:e=>setWalletIdx(+e.target.value),
             style:{background:'var(--panel)',border:'1px solid var(--line-solid)',borderRadius:9,padding:'7px 10px',color:'var(--txt)',fontSize:12,maxWidth:170}},
