@@ -5593,18 +5593,37 @@ function EmissionStatus({chain, project, toast, wallet}) {
           '⚠ ',deployResult.reason),
 
         !deployResult?.ok && h('div',{},
+          !enabled && h('div',{style:{
+            background:'rgba(255,178,62,.04)',
+            border:'1px solid rgba(255,178,62,.2)',
+            padding:'12px 14px',
+            borderRadius:10,
+            marginBottom:14,
+            fontSize:12.5,
+            color:'#FFB23E',
+            lineHeight:1.5
+          }},
+            '⚠️ Para poder desplegar el contrato del token en la red, TOKAI debe completar el checklist de 7 requisitos pre-emisión y habilitar el gate de la serie desde su panel de supervisión.'
+          ),
           h('p',{style:{fontSize:12,color:'var(--txt-dim)',lineHeight:1.6,marginBottom:14}},
-            'Hacé clic para desplegar el contrato ERC-3643 en Polygon PoS vía TokenFactory.',
+            'Hacé clic para desplegar el contrato ' + (p.tokenStandard || 'ERC-3643') + ' en Polygon PoS vía TokenFactory.',
             h('br'),
             'MetaMask te pedirá confirmar la transacción y pagar el gas en POL.',
             h('br'),
             h('span',{style:{color:'var(--txt-mute)',fontSize:11}},'El contrato se registra en TOKAI y el proyecto avanza a la Ronda 6 (Emisión activa).')),
           h('button',{
             className:'btn btn-primary',
-            style:{width:'100%',padding:'11px',fontSize:14,fontWeight:700,opacity:deploying?0.7:1,cursor:deploying?'not-allowed':'pointer'},
-            onClick:handleDeploy,
-            disabled:deploying,
-          }, deploying ? '⏳ Desplegando…' : '🔐 Desplegar Token (MetaMask)'))
+            style:{
+              width:'100%',
+              padding:'11px',
+              fontSize:14,
+              fontWeight:700,
+              opacity: (!enabled || deploying) ? 0.5 : 1,
+              cursor: (!enabled || deploying) ? 'not-allowed' : 'pointer'
+            },
+            onClick: enabled ? handleDeploy : undefined,
+            disabled: !enabled || deploying,
+          }, deploying ? '⏳ Desplegando…' : !enabled ? '🔐 Desplegar Token (Esperando Habilitación TOKAI)' : '🔐 Desplegar Token (MetaMask)'))
       )
     );
   }
