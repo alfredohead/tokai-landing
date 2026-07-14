@@ -240,6 +240,131 @@
     return { ok: false, reason: `Estándar no soportado: ${project.standard}` };
   }
 
+  // ─── 2b. Deploy de Infraestructura — desde el Panel TOKAI ────────────────────
+  //
+  // Despliega TokenFactory + 5 sub-factories + cableado setFactory* en la red destino.
+  // Llamado desde la sub-pestaña "Infraestructura" del panel admin.
+  // NO se ejecuta scripts de terminal — todo lo firma MetaMask en el browser.
+  //
+  // Prerrequisito: window.__TOKAI_BYTECODES__ debe estar disponible
+  //               (inyectado por build-front.js desde los artifacts de Hardhat).
+  //
+  // @param {object} params - { usdcAddress, adminAddress, network, chainId }
+  // @param {ethers.Signer} signer - signer de MetaMask (wallet 0x110a...3976)
+  // @returns {object} - { ok, addresses: { tokenFactory, erc3643, ... }, txHashes, error? }
+
+  async function deployInfrastructure(params, signer) {
+    const bc = window.__TOKAI_BYTECODES__;
+    if (!bc) {
+      return { ok: false, reason: 'window.__TOKAI_BYTECODES__ no disponible. Ejecuta node build-front.js primero.' };
+    }
+    if (!window.ethereum) {
+      return { ok: false, reason: 'MetaMask no detectado.' };
+    }
+
+    const { usdcAddress, adminAddress } = params;
+    if (!usdcAddress || !adminAddress) {
+      return { ok: false, reason: 'usdcAddress y adminAddress son requeridos.' };
+    }
+
+    const E = ethers();
+    const ContractFactory = E.ContractFactory;
+
+    const log = (msg) => console.log(`[TOKAI_WEB3 deployInfra] ${msg}`);
+    const addresses  = {};
+    const txHashes   = {};
+    const blockNums  = {};
+
+    try {
+      // ── 1. Deploy ERC3643Factory ──────────────────────────────────────────
+      log('Desplegando ERC3643Factory…');
+      const f3643 = new ContractFactory(bc.ERC3643Factory.abi, bc.ERC3643Factory.bytecode, signer);
+      const c3643 = await f3643.deploy(usdcAddress, adminAddress);
+      const r3643 = await c3643.deploymentTransaction().wait();
+      addresses.erc3643 = await c3643.getAddress();
+      txHashes.erc3643  = r3643.hash;
+      blockNums.erc3643 = r3643.blockNumber;
+      log(`ERC3643Factory → ${addresses.erc3643}`);
+
+      // ── 2. Deploy ERC4626Factory ──────────────────────────────────────────
+      log('Desplegando ERC4626Factory…');
+      const f4626 = new ContractFactory(bc.ERC4626Factory.abi, bc.ERC4626Factory.bytecode, signer);
+      const c4626 = await f4626.deploy(usdcAddress, adminAddress);
+      const r4626 = await c4626.deploymentTransaction().wait();
+      addresses.erc4626 = await c4626.getAddress();
+      txHashes.erc4626  = r4626.hash;
+      log(`ERC4626Factory → ${addresses.erc4626}`);
+
+      // ── 3. Deploy ERC7540Factory ──────────────────────────────────────────
+      log('Desplegando ERC7540Factory…');
+      const f7540 = new ContractFactory(bc.ERC7540Factory.abi, bc.ERC7540Factory.bytecode, signer);
+      const c7540 = await f7540.deploy(usdcAddress, adminAddress);
+      const r7540 = await c7540.deploymentTransaction().wait();
+      addresses.erc7540 = await c7540.getAddress();
+      txHashes.erc7540  = r7540.hash;
+      log(`ERC7540Factory → ${addresses.erc7540}`);
+
+      // ── 4. Deploy ERC1155Factory ──────────────────────────────────────────
+      log('Desplegando ERC1155Factory…');
+      const f1155 = new ContractFactory(bc.ERC1155Factory.abi, bc.ERC1155Factory.bytecode, signer);
+      const c1155 = await f1155.deploy(adminAddress);
+      const r1155 = await c1155.deploymentTransaction().wait();
+      addresses.erc1155 = await c1155.getAddress();
+      txHashes.erc1155  = r1155.hash;
+      log(`ERC1155Factory → ${addresses.erc1155}`);
+
+      // ── 5. Deploy ERC5192Factory ──────────────────────────────────────────
+      log('Desplegando ERC5192Factory…');
+      const f5192 = new ContractFactory(bc.ERC5192Factory.abi, bc.ERC5192Factory.bytecode, signer);
+      const c5192 = await f5192.deploy(adminAddress);
+      const r5192 = await c5192.deploymentTransaction().wait();
+      addresses.erc5192 = await c5192.getAddress();
+      txHashes.erc5192  = r5192.hash;
+      log(`ERC5192Factory → ${addresses.erc5192}`);
+
+      // ── 6. Deploy TokenFactory (orquestador) ─────────────────────────────
+      log('Desplegando TokenFactory…');
+      const fTF = new ContractFactory(bc.TokenFactory.abi, bc.TokenFactory.bytecode, signer);
+      const cTF = await fTF.deploy(usdcAddress, adminAddress);
+      const rTF = await cTF.deploymentTransaction().wait();
+      addresses.tokenFactory = await cTF.getAddress();
+      txHashes.tokenFactory  = rTF.hash;
+      blockNums.tokenFactory = rTF.blockNumber;
+      log(`TokenFactory → ${addresses.tokenFactory}`);
+
+      // ── 7. Cablear sub-factories en TokenFactory ──────────────────────────
+      log('Cableando sub-factories…');
+      const tf = new (E.Contract)(addresses.tokenFactory, bc.TokenFactory.abi, signer);
+
+      const txSet3643 = await tf.setFactory3643(addresses.erc3643); await txSet3643.wait();
+      const txSet4626 = await tf.setFactory4626(addresses.erc4626); await txSet4626.wait();
+      const txSet7540 = await tf.setFactory7540(addresses.erc7540); await txSet7540.wait();
+      const txSet1155 = await tf.setFactory1155(addresses.erc1155); await txSet1155.wait();
+      const txSet5192 = await tf.setFactory5192(addresses.erc5192); await txSet5192.wait();
+      log('Sub-factories cableadas ✓');
+
+      return {
+        ok: true,
+        addresses,
+        txHashes,
+        blockNumbers: blockNums,
+        deployTxHash:    txHashes.tokenFactory,
+        deployBlockNumber: blockNums.tokenFactory,
+        deployedBy:      adminAddress,
+      };
+
+    } catch (err) {
+      console.error('[TOKAI_WEB3 deployInfra] Error:', err);
+      return {
+        ok: false,
+        reason: err.reason || err.message || 'Error desconocido en el deploy',
+        addresses,    // parcial — lo que llegó a desplegarse
+        txHashes,
+      };
+    }
+  }
+
+
   // ─── 3. Emisión — TOKAIToken ──────────────────────────────────────────────────
 
   /**
@@ -583,6 +708,7 @@
     deployERC7540,
     deployERC1155,
     deployERC5192,
+    deployInfrastructure,    // Deploy de TokenFactory + sub-factories desde el panel admin
 
     // Token ops
     mint,
