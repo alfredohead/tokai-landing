@@ -7722,7 +7722,7 @@ function usePreGAT(walletAddr) {
   }
 
   async function loadStatus() {
-    if (!cfg || !window.ethers) {
+    if (!cfg || !window.ethers || !window.__TOKAI_ENABLE_LIVE_MODE__) {
       var snap = snapshotStatus();
       if (snap) setStatus(snap);
       return;
@@ -8511,8 +8511,29 @@ function App(){
     sidebarOpen&&h('div',{onClick:()=>setSidebarOpen(false),style:{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:80}}),
     h('div',{className:'main'},
       (function(){
-        const esSimulacionInversor = auth && (auth.isAdmin || (auth.approved && auth.method!=='wallet')) && role === 'investor';
-        if (!esSimulacionInversor) return null;
+        const esSimulacion = auth && auth.isAdmin && role !== 'tokai';
+        const esSimulacionEmisorInversor = auth && !auth.isAdmin && auth.approved && auth.method !== 'wallet' && role === 'investor';
+        if (!esSimulacion && !esSimulacionEmisorInversor) return null;
+        
+        let label = '';
+        let backText = '';
+        let onBack = null;
+        
+        if (auth.isAdmin) {
+          label = 'Estás viendo la plataforma con el rol de ' + (role === 'investor' ? 'Inversor' : 'Emisor') + '.';
+          backText = 'Volver a Supervisión TOKAI';
+          onBack = () => {
+            activateRole('tokai');
+            go('tokai');
+          };
+        } else {
+          label = 'Estás viendo la plataforma con el rol de Inversor.';
+          backText = 'Volver a Administración Emisor';
+          onBack = () => {
+            if (activateRole('issuer')) go('home');
+          };
+        }
+        
         return h('div', {
           style: {
             background: 'linear-gradient(90deg, rgba(0,214,126,.15), rgba(0,0,0,0))',
@@ -8527,20 +8548,13 @@ function App(){
         },
           h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
             h('span', { style: { color: 'var(--emerald)', fontWeight: 800 } }, '✦ SIMULACIÓN'),
-            'Estás viendo la plataforma con el rol de Inversor.'
+            label
           ),
           h('button', {
-            onClick: () => {
-              if (auth.isAdmin) {
-                activateRole('tokai');
-                go('tokai');
-              } else {
-                if(activateRole('issuer')) switchMode('simple');
-              }
-            },
+            onClick: onBack,
             className: 'btn btn-primary btn-sm',
             style: { padding: '5px 12px', fontSize: '11.5px' }
-          }, auth.isAdmin ? 'Volver a Supervisión TOKAI' : 'Volver a Administración Emisor')
+          }, backText)
         );
       })(),
       /* ── Barra de red incorrecta (si MetaMask conectada pero red equivocada) ── */
