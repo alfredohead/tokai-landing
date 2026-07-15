@@ -8639,7 +8639,7 @@ function App(){
           liveModeEnabled&&h('div',{className:'role-switch'},
             h('button',{className:'role-btn'+(!isReal?' active':''),onClick:()=>setMode('demo')},'Demo'),
             h('button',{className:'role-btn'+(isReal?' active':''),onClick:()=>setMode('real')},'Real')),
-          h('div',{className:'role-switch'},
+          (canAccessRole('issuer') || canAccessRole('tokai')) && h('div',{className:'role-switch'},
             h('button',{className:'role-btn'+(role==='investor'?' active':''),onClick:()=>activateRole('investor')},'Inversor'),
             canAccessRole('issuer')&&h('button',{className:'role-btn'+(role==='issuer'?' active':''),onClick:()=>{ if(activateRole('issuer')) switchMode('simple'); }},'Emisor'),
             canAccessRole('tokai')&&h('button',{className:'role-btn'+(role==='tokai'?' active':''),onClick:()=>activateRole('tokai')},'TOKAI')),
@@ -8663,11 +8663,11 @@ function App(){
         view==='tokai'&&canAccessRole('tokai')&&h(TokaiView,{chain,toast,subView,go}),
         view==='admin'&&canAccessRole('issuer')&&h(AdminView,{chain,wallet,toast,subView}),
         view==='guide'&&h(GuideView,{chain,role,go,setRole:activateRole}),
-        view==='thesis-editor'&&h(ThesisFlexEditor,{chain,toast,go}),
-        view==='thesis-client'&&h(ThesisClientView,{chain,toast}),
-        view==='emission-engine'&&h(EmissionPreview,{chain,toast}),
-        view==='emission-checklist'&&h(EmissionChecklist,{chain,toast}),
-        view==='report-gen'&&h(ReportExporter,{chain,toast})
+        view==='thesis-editor'&&canAccessRole('tokai')&&h(ThesisFlexEditor,{chain,toast,go}),
+        view==='thesis-client'&&canAccessRole('issuer')&&h(ThesisClientView,{chain,toast}),
+        view==='emission-engine'&&canAccessRole('tokai')&&h(EmissionPreview,{chain,toast}),
+        view==='emission-checklist'&&canAccessRole('tokai')&&h(EmissionChecklist,{chain,toast}),
+        view==='report-gen'&&canAccessRole('tokai')&&h(ReportExporter,{chain,toast})
       )
     )
   );
