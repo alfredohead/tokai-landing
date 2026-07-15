@@ -8325,7 +8325,8 @@ function App(){
   const web3 = (typeof useWeb3==='function') ? useWeb3() : { available:false };
   const live = (typeof useChainWeb3==='function') ? useChainWeb3(web3.account) : null;
   const liveModeEnabled = (typeof window !== 'undefined') && window.__TOKAI_ENABLE_LIVE_MODE__ !== false;
-  const realRequested = liveModeEnabled && liveMode === 'real';
+  const isDemoInvestor = !!(auth && auth.method === 'wallet' && auth.id === '0xDEMO');
+  const realRequested = liveModeEnabled && liveMode === 'real' && !isDemoInvestor;
   const isLive = !!(realRequested && web3.account && web3.chainOk && (typeof window!=='undefined') && window.__DEPLOYMENT__ && live);
   const isReal = realRequested;
   const chain = isLive ? live : sim;
@@ -8527,7 +8528,7 @@ function App(){
             h('span',{className:'topbar-title'},simpleTitles[view]||'TOKAI'),
             h('span',{className:'badge '+(isReal?'green':'gray'),style:{fontSize:9,marginLeft:4}},isReal?(isLive?'● REAL WEB3':'● REAL PREVENTA'):'DEMO')),
           h('div',{className:'topbar-right'},
-            liveModeEnabled&&h('div',{className:'role-switch'},
+            liveModeEnabled&&!isDemoInvestor&&h('div',{className:'role-switch'},
               h('button',{className:'role-btn'+(!isReal?' active':''),onClick:()=>setMode('demo')},'Demo'),
               h('button',{className:'role-btn'+(isReal?' active':''),onClick:()=>setMode('real')},'Real')),
             h('div',{className:'wallet-chip'},h('span',{className:'dot'}),auth.label||short(wallet.addr)),
@@ -8643,7 +8644,7 @@ function App(){
           h('span',{className:'topbar-title'},view==='tokai'?(tokaiSubTitles[subView]||'Panel TOKAI'):titles[view]),
           h('span',{className:'badge '+(isReal?'green':'gray'),style:{fontSize:9,marginLeft:4}},isReal?(isLive?'● REAL WEB3':'● REAL PREVENTA'):'DEMO')),
         h('div',{className:'topbar-right'},
-          liveModeEnabled&&h('div',{className:'role-switch'},
+          liveModeEnabled&&!isDemoInvestor&&h('div',{className:'role-switch'},
             h('button',{className:'role-btn'+(!isReal?' active':''),onClick:()=>setMode('demo')},'Demo'),
             h('button',{className:'role-btn'+(isReal?' active':''),onClick:()=>setMode('real')},'Real')),
           (canAccessRole('issuer') || canAccessRole('tokai')) && h('div',{className:'role-switch'},
