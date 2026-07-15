@@ -241,7 +241,7 @@ window.TOKEN_STRATEGIES = {
    Si no está seteado, la plataforma sigue en modo demo.
    Nota: producción usa el endpoint Fly.io directo (el custom domain api.tokairwa.com
    queda pendiente de verificación DNS completa). */
-window.__API_URL__ = '/api/v1';
+window.__API_URL__ = (typeof window !== 'undefined' && window.location.protocol !== 'file:') ? '/api/v1' : null;
 window.__TOKAI_ENABLE_LIVE_MODE__ = window.__TOKAI_ENABLE_LIVE_MODE__ !== false;
 
 /* Interceptor global de fetch para inyectar token JWT */
