@@ -8285,7 +8285,6 @@ function PreGATInvestorCard({ walletAddr, toast }) {
 function App(){
   const [auth,setAuth] = useState(null);
   const [paid,setPaid] = useState(false); // retainer de estructuración pagado
-  const [uiMode,setUiMode] = useState('simple');
   const [view,setView] = useState('home');
   const [activeProject,setActiveProject] = useState(null);
   const [role,setRole] = useState('issuer');
@@ -8294,10 +8293,6 @@ function App(){
   const [sidebarOpen,setSidebarOpen] = useState(false);
   const [liveMode,setLiveMode] = useState(function(){
     if(typeof window === 'undefined' || window.__TOKAI_ENABLE_LIVE_MODE__ === false) return 'demo';
-    /* Default 'demo' para que el panel del inversor sea plenamente operativo sin
-       MetaMask. Antes arrancaba en 'real' → sin wallet caía en "REAL PREVENTA"
-       con address 0x0000 y chain real vacío ("se traba / hay que reingresar").
-       Real sigue a un click y se usa on-chain al conectar wallet. */
     return localStorage.getItem('tokai_live_mode') || 'demo';
   });
 
@@ -8362,7 +8357,6 @@ function App(){
     const label = targetRole==='tokai' ? 'TOKAI' : targetRole==='issuer' ? 'Emisor' : 'Inversor';
     toast&&toast({type:'warn',title:'Acceso restringido',msg:'La wallet demo solo habilita el perfil Inversor. El perfil '+label+' requiere una cuenta aprobada.'});
     setRole('investor');
-    setUiMode('expert');
     go('dash');
   }
 
@@ -8380,7 +8374,7 @@ function App(){
     function handleHashChange() {
       const hash = window.location.hash.replace('#/', '').replace('#', '');
       if (!hash) {
-        const defaultView = role === 'tokai' ? 'tokai' : (role === 'issuer' ? (uiMode === 'simple' ? 'home' : 'admin') : 'dash');
+        const defaultView = role === 'tokai' ? 'tokai' : (role === 'issuer' ? 'home' : 'dash');
         const defaultSub = role === 'tokai' ? 'dashboard' : 'projects';
         setView(defaultView);
         setSubView(defaultSub);
@@ -8400,7 +8394,6 @@ function App(){
       if (['admin', 'tokai'].includes(v)) {
         sub = parts[1] || (v === 'admin' ? 'projects' : 'dashboard');
       } else {
-        /* Los proyectos reales usan UUID: solo castear a Number los ids demo numéricos */
         const rawPid = parts[1];
         pid = rawPid != null && rawPid !== '' ? (/^\d+$/.test(rawPid) ? Number(rawPid) : rawPid) : null;
         sub = parts[2] || null;
@@ -8416,40 +8409,10 @@ function App(){
     }
 
     window.addEventListener('hashchange', handleHashChange);
-    handleHashChange(); // Sincronización inicial
+    handleHashChange();
 
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [role, uiMode, auth, paid]);
-
-  /* Guarda de redirección según el rol de experto */
-  useEffect(()=>{
-    if(uiMode!=='expert') return;
-    let target = view;
-    if(role==='tokai') {
-      const allowedTokaiViews = ['tokai','report-gen','emission-engine','emission-checklist','thesis-editor','dash','market','guide'];
-      target = allowedTokaiViews.includes(view) ? view : 'tokai';
-    }
-    else if(role==='issuer') target = view==='guide'?'guide':(['invest','portfolio','asset'].includes(view)?'admin':(view==='tokai'?'admin':view));
-    else target = view==='guide'?'guide':(['admin','tokai','home','wizard','pagos','thesis-client','thesis-editor','emission-engine','emission-checklist','report-gen'].includes(view)?'dash':view);
-    
-    if (target !== view) {
-      go(target, activeProject);
-    }
-  },[role,uiMode]);
-
-  function switchMode(m){
-    setUiMode(m);
-    if(m==='simple'){
-      if(!canAccessRole('issuer')){
-        denyRole('issuer');
-        return;
-      }
-      setRole('issuer');
-      go('home');
-    } else {
-      go(role==='tokai'?'tokai':'dash');
-    }
-  }
+  }, [role, auth, paid]);
 
   /* ── Restore de sesión desde cookie HttpOnly ── */
   useEffect(()=>{
@@ -8462,12 +8425,12 @@ function App(){
       const isAdmin = backendRole === 'admin';
       const approved = data.status === 'approved';
       setAuth({ method:'email', id:data.email, label: isAdmin ? 'TOKAI Admin' : data.email.split('@')[0], role:frontRole, isAdmin, approved });
-      if(isAdmin){ setRole('tokai'); setUiMode('expert'); setView('tokai'); }
-      else if(approved){ setRole('issuer'); setUiMode('simple'); setView('home'); setPaid(true); }
-      else { setRole('issuer'); setUiMode('simple'); setView('home'); setPaid(false); }
+      if(isAdmin){ setRole('tokai'); setView('tokai'); }
+      else if(approved){ setRole('issuer'); setView('home'); setPaid(true); }
+      else { setRole('issuer'); setView('home'); setPaid(false); }
     }).catch(()=>{
       localStorage.removeItem('tokai_jwt');
-    }); // sin sesión activa
+    });
   },[]);
 
   if(!auth) return h(LoginGate,{onLogin:(a)=>{
@@ -8475,16 +8438,16 @@ function App(){
     setPaid(false);
     if(a.isAdmin || a.role==='tokai'){
       /* TOKAI admin: acceso total, panel laboratorio directo */
-      setRole('tokai'); setUiMode('expert'); setView('tokai');
+      setRole('tokai'); setView('tokai');
     } else if(a.method === 'wallet' || a.role === 'investor'){
       /* Login con wallet: modo inversor */
-      setRole('investor'); setUiMode('expert'); setView('dash');
+      setRole('investor'); setView('dash');
     } else if(a.approved){
       /* Emisor aprobado por TOKAI: entra directo al wizard */
-      setRole('issuer'); setUiMode('simple'); setView('home'); setPaid(true);
+      setRole('issuer'); setView('home'); setPaid(true);
     } else {
       /* Emisor no aprobado: ve el ContactGate */
-      setRole('issuer'); setUiMode('simple'); setView('home'); setPaid(false);
+      setRole('issuer'); setView('home'); setPaid(false);
     }
   }, web3, toast});
 
@@ -8494,52 +8457,6 @@ function App(){
      Enviar el formulario NO desbloquea el acceso: el gate lo controla TOKAI. */
   if(role==='issuer' && !paid && !auth.isAdmin) return h(ContactGate,{auth, toast});
 
-  if(uiMode==='simple'){
-    const simpleTitles={home:'Inicio',wizard:'Crear proyecto',admin:'Mis proyectos',asset:'Mi proyecto',guide:'Cómo funciona',market:'Mercado',dash:'Proyectos','thesis-client':'Tesis de Valor','thesis-editor':'Tesis de Valor',pagos:'Pagos'};
-    const simpleNav=[['home','Inicio','M3 12l9-9 9 9M5 10v10h14V10'],['admin','Mis proyectos','M3 7h18M3 12h18M3 17h18'],['thesis-client','Tesis de valor','M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'],['pagos','Pagos','M2 7h20v10H2zM2 11h20'],['market','Mercado secundario','M3 3v18h18M7 16l4-4 4 4 5-6'],['guide','Cómo funciona','M12 17v.01M12 13a2 2 0 10-2-2'],['dash','Ver como inversor','M2 12s3-7 10-7 10 7 10 7-3 7-10 7S2 12 2 12z']];
-    return h('div',{className:'app'},
-      h('div',{className:'sidebar'+(sidebarOpen?' open':'')},
-        h('a',{href:'/',className:'brand',style:{textDecoration:'none',color:'inherit'}},
-          h('img',{src:'data:image/png;base64,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',style:{width:36,height:36,borderRadius:8,objectFit:'cover'}}),
-          h('div',{className:'brand-txt'},h('span',{className:'brand-name'},'TOKAI'),h('span',{className:'brand-sub'},'RWA · LABORATORIO'))),
-        h('div',{className:'nav'},
-          h('div',{className:'nav-label'},'Menú'),
-          simpleNav.map(([k,label,icon])=>h('button',{key:k,className:'nav-item'+(view===k||(k==='dash'&&view==='asset')?' active':''),
-            onClick:()=>{
-              if(k==='dash'){
-                setRole('investor');
-                setUiMode('expert');
-                go('dash');
-              } else {
-                go(k);
-              }
-            }},
-            h(Icon,{d:icon}),label)),
-          h('div',{style:{flex:1}})),
-        h('div',{className:'sidebar-foot'},
-          h('span',{className:'net-dot'}),'Panel del emisor',h('br'),
-          h('span',{style:{color:'var(--txt-mute)',opacity:.7}},'TOKAI estructura · nunca es PSAV'))
-      ),
-      sidebarOpen&&h('div',{onClick:()=>setSidebarOpen(false),style:{position:'fixed',inset:0,background:'rgba(0,0,0,.5)',zIndex:80}}),
-      h('div',{className:'main'},
-        h('div',{className:'topbar'},
-          h('div',{style:{display:'flex',alignItems:'center',gap:14}},
-            h('button',{className:'menu-btn',onClick:()=>setSidebarOpen(true)},h(Icon,{d:'M3 12h18M3 6h18M3 18h18',style:{width:18,height:18}})),
-            h('span',{className:'topbar-title'},simpleTitles[view]||'TOKAI'),
-            h('span',{className:'badge '+(isReal?'green':'gray'),style:{fontSize:9,marginLeft:4}},isReal?(isLive?'● REAL WEB3':'● REAL PREVENTA'):'DEMO')),
-          h('div',{className:'topbar-right'},
-            liveModeEnabled&&!isDemoInvestor&&h('div',{className:'role-switch'},
-              h('button',{className:'role-btn'+(!isReal?' active':''),onClick:()=>setMode('demo')},'Demo'),
-              h('button',{className:'role-btn'+(isReal?' active':''),onClick:()=>setMode('real')},'Real')),
-            h('div',{className:'wallet-chip'},h('span',{className:'dot'}),auth.label||short(wallet.addr)),
-            h('button',{className:'btn btn-ghost btn-sm',onClick:async()=>{ 
-              if(window.__API_URL__) await fetch(window.__API_URL__+'/auth/logout',{method:'POST',credentials:'include'}).catch(()=>{}); 
-              localStorage.removeItem('tokai_jwt');
-              setAuth(null);setView('home'); 
-            }},'Salir'))
-        ),
-        h('div',{className:'content'},
-          view==='home'&&h(HomeEmisor,{chain,auth,go,wallet,connectWallet:()=>web3.connect&&web3.connect()}),
           view==='wizard'&&h(WizardCrear,{chain,toast,go}),
           view==='admin'&&h(AdminView,{chain,wallet,toast}),
           view==='asset'&&h(AssetDetail,{chain,wallet,pid:activeProject==null?0:activeProject,toast,go}),
