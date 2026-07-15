@@ -8457,20 +8457,7 @@ function App(){
      Enviar el formulario NO desbloquea el acceso: el gate lo controla TOKAI. */
   if(role==='issuer' && !paid && !auth.isAdmin) return h(ContactGate,{auth, toast});
 
-          view==='wizard'&&h(WizardCrear,{chain,toast,go}),
-          view==='admin'&&h(AdminView,{chain,wallet,toast}),
-          view==='asset'&&h(AssetDetail,{chain,wallet,pid:activeProject==null?0:activeProject,toast,go}),
-          view==='guide'&&h(GuideView,{chain,role:'issuer',go,setRole:activateRole}),
-          view==='thesis-client'&&h(ThesisClientView,{chain,toast}),
-          view==='pagos'&&h(PagosEmisor,{toast}),
-          view==='dash'&&h(Dashboard,{chain,go,liveMode,liveWalletAddr}),
-          view==='market'&&h(MarketView,{chain,wallet,toast,initialPid:activeProject})
-        ),
-        // botón flotante del asistente: emisor en modo simple
-        h(IssuerAssistantFloat,{chain})
-      )
-    );
-  }
+
 
   const nav = {
     investor:[['dash','Proyectos',I.proj],['portfolio','Mi cartera',I.wallet],['invest','Suscribir',I.invest],['market','Mercado secundario',I.market],['guide','Guía de uso',I.doc]],
@@ -8592,6 +8579,9 @@ function App(){
             web3.connecting?'Conectando…':web3.account?(web3.chainOk?'● '+short(web3.account):'⚠ Red incorrecta'):'Conectar wallet'))
       ),
       h('div',{className:'content'},
+        view==='home'&&role==='issuer'&&h(HomeEmisor,{chain,auth,go,wallet,connectWallet:()=>web3.connect&&web3.connect()}),
+        view==='wizard'&&role==='issuer'&&h(WizardCrear,{chain,toast,go}),
+        view==='pagos'&&role==='issuer'&&h(PagosEmisor,{toast}),
         view==='dash'&&h(Dashboard,{chain,go,liveMode,liveWalletAddr}),
         view==='asset'&&h(AssetDetail,{chain,wallet,pid:activeProject==null?0:activeProject,toast,go}),
         view==='invest'&&h(InvestView,{chain,wallet,projectId:activeProject,toast}),
@@ -8607,7 +8597,8 @@ function App(){
         view==='emission-engine'&&canAccessRole('tokai')&&h(EmissionPreview,{chain,toast}),
         view==='emission-checklist'&&canAccessRole('tokai')&&h(EmissionChecklist,{chain,toast}),
         view==='report-gen'&&canAccessRole('tokai')&&h(ReportExporter,{chain,toast})
-      )
+      ),
+      role==='issuer'&&h(IssuerAssistantFloat,{chain})
     )
   );
 }
