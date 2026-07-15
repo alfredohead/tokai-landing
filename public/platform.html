@@ -3939,7 +3939,7 @@ function LoginGate({onLogin, web3, toast}){
       setError(errMsg);
       toast&&toast({type:'err',title:'No se pudo conectar',msg:errMsg});
     } else {
-      onLogin({method:'wallet', id:'0xDEMO', label:'Wallet demo', role:'investor', approved:true});
+      setError('MetaMask no está disponible o no se detectó en tu navegador. Si ya lo instalaste, desbloquealo, asegurate de permitir el acceso a este sitio y recargá la página. También podés descargarlo desde metamask.io o usar la wallet de demostración.');
     }
   }
 
@@ -4004,15 +4004,22 @@ function LoginGate({onLogin, web3, toast}){
 
         /* ── FASE: wallet ── */
         tab==='wallet'&&phase==='input'&&h('div',{},
-          h('p',{style:{fontSize:12.5,color:'var(--txt-dim)',lineHeight:1.6,marginBottom:6}},
+          h('p',{style:{fontSize:12.5,color:'var(--txt-dim)',lineHeight:1.6,marginBottom:12}},
             web3&&web3.available
               ?'Acceso para inversores. Conectá tu wallet para ver tu portfolio y operar.'
-              :'No detectamos MetaMask. Podés explorar con una wallet de demostración.'),
-          h('p',{style:{fontSize:11,color:'var(--txt-mute)',lineHeight:1.4,marginBottom:14}},
-            '¿Querés presentar un proyecto? Usá el acceso por email (tab izquierdo).'),
-          h('button',{className:'btn btn-primary',style:{width:'100%'},onClick:loginWallet},
-            web3&&web3.available?'Conectar wallet →':'Explorar en modo demo →'),
-          h('p',{style:{fontSize:10.5,color:'var(--txt-mute)',marginTop:10,lineHeight:1.4,textAlign:'center'}},
+              :'No detectamos MetaMask en tu navegador. Podés instalar la extensión para operar on-chain, intentar conectar nuevamente o explorar la plataforma con una wallet de demostración.'),
+          h('div',{style:{display:'flex',flexDirection:'column',gap:10}},
+            h('button',{className:'btn btn-primary',style:{width:'100%'},onClick:loginWallet},'Conectar wallet →'),
+            !(web3&&web3.available)&&h('a',{
+              className:'btn btn-ghost',
+              style:{width:'100%',textDecoration:'none',display:'flex',alignItems:'center',justifyContent:'center',gap:8},
+              href:'https://metamask.io/download/',
+              target:'_blank',
+              rel:'noopener noreferrer'
+            },'Instalar MetaMask 🦊'),
+            h('button',{className:'btn btn-ghost',style:{width:'100%'},onClick:()=>onLogin({method:'wallet', id:'0xDEMO', label:'Wallet demo', role:'investor', approved:true})},'Explorar en modo demo →')
+          ),
+          h('p',{style:{fontSize:10.5,color:'var(--txt-mute)',marginTop:14,lineHeight:1.4,textAlign:'center'}},
             'Compatible con MetaMask, Rainbow, Coinbase Wallet.')),
 
         /* ── FASE: esperando firma wallet ── */
