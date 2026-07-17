@@ -7401,9 +7401,14 @@ function AdminAccesos({ chain, toast }) {
                   ? h('div', { style: { display: 'flex', gap: 6 } },
                       h('button', { className: 'btn btn-primary btn-sm', style: { fontSize: 11 }, onClick: function(){ actInvestOrder(o.id, 'confirm'); }, title: 'Confirma fondos y da de alta la wallet en la whitelist' }, '✓ Fondos OK'),
                       h('button', { className: 'btn btn-ghost btn-sm', style: { fontSize: 11, color: '#FF5C5C', borderColor: 'rgba(255,92,92,.3)' }, onClick: function(){ actInvestOrder(o.id, 'reject'); } }, 'Rechazar'))
-                  : h('span', { style: { padding: '3px 8px', borderRadius: 7, fontSize: 11, fontWeight: 700,
-                      background: o.status === 'funds_confirmed' || o.status === 'minted' ? 'rgba(0,214,126,.15)' : 'rgba(255,92,92,.12)',
-                      color: o.status === 'funds_confirmed' || o.status === 'minted' ? 'var(--emerald)' : '#FF5C5C' } }, o.status.toUpperCase())));
+                  : h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' } },
+                      h('span', { style: { padding: '3px 8px', borderRadius: 7, fontSize: 11, fontWeight: 700,
+                          background: o.status === 'funds_confirmed' || o.status === 'minted' ? 'rgba(0,214,126,.15)' : 'rgba(255,92,92,.12)',
+                          color: o.status === 'funds_confirmed' || o.status === 'minted' ? 'var(--emerald)' : '#FF5C5C' } }, o.status.toUpperCase()),
+                      (o.status === 'funds_confirmed' || o.status === 'minted') && !o.wallet_address && h('span', {
+                          style: { padding: '2px 7px', borderRadius: 6, fontSize: 10, fontWeight: 700, background: 'rgba(255,178,62,.15)', color: '#FFB23E' },
+                          title: 'Los fondos se confirmaron pero la orden no tenía wallet — no se dio de alta en la whitelist del proyecto. Pedile la wallet al inversor y agregala manualmente desde Whitelist on-chain.'
+                        }, '⚠ Sin whitelist'))));
           }))));
     })(),
 
