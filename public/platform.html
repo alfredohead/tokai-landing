@@ -8348,6 +8348,21 @@ function App(){
     setSidebarOpen(false);
   }
 
+  /* Cierra la sesión en este dispositivo: limpia la cookie HttpOnly en el
+     backend y el JWT de respaldo en localStorage (usado como fallback cross-origin).
+     Sin esto, un token guardado sigue autenticando por su vigencia completa aunque
+     el usuario "cierre" la pestaña — no hay otra forma de invalidar la sesión local. */
+  function doLogout(){
+    if(window.__API_URL__){
+      fetch(window.__API_URL__ + '/auth/logout', { method:'POST', credentials:'include' }).catch(function(){});
+    }
+    try{ localStorage.removeItem('tokai_jwt'); }catch(e){}
+    setAuth(null);
+    setPaid(false);
+    setSidebarOpen(false);
+    window.location.hash = '';
+  }
+
   /* ── Guardas de rol: la wallet demo solo habilita el perfil Inversor ── */
   function canAccessRole(targetRole){
     if(targetRole==='investor') return true;
@@ -8481,6 +8496,8 @@ function App(){
         h('div',{className:'nav-label'},role==='investor'?'Inversor':role==='issuer'?'Emisor':'Laboratorio'),
         nav.map(([k,label,icon,sub])=>h('button',{key:k+(sub||''),className:'nav-item'+((view===k&&(!sub||subView===sub))||(k==='dash'&&view==='asset')?' active':''),onClick:()=>go(k,null,sub)},
           h(Icon,{d:icon}),label)),
+        auth && h('button',{key:'logout',className:'nav-item',title:'Cierra la sesión en este dispositivo (borra la cookie y el token guardado)',onClick:doLogout,style:{color:'var(--red, #FF5C5C)'}},
+          h(Icon,{d:I.x}),'Cerrar sesión'),
         h('div',{style:{flex:1}}),
         h('div',{className:'nav-label'},'Demo'),
         h('div',{style:{padding:'4px 12px'}},
