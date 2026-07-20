@@ -7982,10 +7982,10 @@ function PreGATAdminPanel({ toast, chain, project }) {
     setTxLoading(false);
   }
 
+  var emissionStack = getEmissionStack(selectedProject);
   var tabs = [['dashboard','Dashboard'],['whitelist','Accesos on-chain'],['mint','Certificados'],['phase2','Canje ' + (emissionStack[1] && emissionStack[1].symbol || 'definitivo')]];
 
   var pct = function(n, d){ return d > 0 ? ((n/d)*100).toFixed(1) : '0.0'; };
-  var emissionStack = getEmissionStack(selectedProject);
 
   return h('div', {},
     /* Header */
