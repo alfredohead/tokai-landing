@@ -93,17 +93,23 @@ VERTICALES: Rodados/Movilidad, Inmobiliario, Security Tokens, Asset-Backed, Util
       })
     });
 
-    // El pool de workers gratuito de NVIDIA NIM se satura seguido (503 ResourceExhausted,
-    // se observó cola de cientos de requests contra 48 workers) — con 3 intentos y backoff
-    // corto la probabilidad de éxito sube bastante sin sumar demasiada latencia percibida.
+    // Manejar reintentos ante saturación de workers en NVIDIA NIM (429, 500, 502, 503, 504 ResourceExhausted)
     let response = await doCall();
-    for (let attempt = 1; response.status === 503 && attempt < 3; attempt++) {
-      await new Promise((r) => setTimeout(r, 400 * attempt));
+    const retryStatuses = [429, 500, 502, 503, 504];
+    for (let attempt = 1; retryStatuses.includes(response.status) && attempt <= 4; attempt++) {
+      const delay = Math.min(500 * Math.pow(1.8, attempt - 1), 3000) + Math.random() * 200;
+      await new Promise((r) => setTimeout(r, delay));
       response = await doCall();
     }
 
     const data = await response.json();
-    if (!response.ok) return res.status(response.status).json({ error: data.error?.message || 'Error de IA' });
+    if (!response.ok) {
+      const isRateLimit = response.status === 429 || response.status === 503 || (data.error?.message || '').includes('limit');
+      const errorMsg = isRateLimit
+        ? 'El servidor de IA está recibiendo alta demanda en este momento (límite de workers alcanzado). Por favor reintentá en unos segundos.'
+        : (data.error?.message || 'Error de IA');
+      return res.status(response.status).json({ error: errorMsg });
+    }
 
     const msgObj = data.choices?.[0]?.message;
     const reply = (msgObj?.content && msgObj.content.trim())
