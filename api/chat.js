@@ -84,7 +84,7 @@ VERTICALES: Rodados/Movilidad, Inmobiliario, Security Tokens, Asset-Backed, Util
         top_p: 0.95,
         chat_template_kwargs: {
           thinking: true,
-          reasoning_effort: "high"
+          reasoning_effort: "medium"
         },
         messages: [
           { role: 'system', content: SYSTEM },
