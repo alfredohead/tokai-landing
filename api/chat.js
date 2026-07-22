@@ -40,7 +40,7 @@ export default async function handler(req, res) {
   rateLimit.set(ip, entry);
   if (entry.count > RATE_LIMIT) return res.status(429).json({ error: 'Demasiadas solicitudes. Esperá un momento.' });
 
-  const apiKey = cleanEnv(process.env.DEEPSEEK_API_KEY) || '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';
+  const apiKey = cleanEnv(process.env.DEEPSEEK_API_KEY) || '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';
   if (!apiKey) return res.status(500).json({ error: 'API key no configurada' });
 
   const { messages } = req.body || {};
@@ -79,9 +79,9 @@ VERTICALES: Rodados/Movilidad, Inmobiliario, Security Tokens, Asset-Backed, Util
       },
       body: JSON.stringify({
         model: deepSeekModel(),
-        max_tokens: 2048,
-        temperature: 0.7,
-        top_p: 0.95,
+        max_tokens: 1024,
+        temperature: 0.2,
+        top_p: 0.7,
         messages: [
           { role: 'system', content: SYSTEM },
           ...messages
