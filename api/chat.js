@@ -14,9 +14,9 @@ function cleanEnv(value) {
 }
 
 function deepSeekModel() {
-  const model = cleanEnv(process.env.DEEPSEEK_MODEL) || 'deepseek-ai/deepseek-v4-flash';
+  const model = cleanEnv(process.env.DEEPSEEK_MODEL) || 'meta/llama-3.3-70b-instruct';
   return (model === 'deepseek-chat' || model === 'deepseek-v4-flash')
-    ? 'deepseek-ai/deepseek-v4-flash'
+    ? 'meta/llama-3.3-70b-instruct'
     : model;
 }
 
@@ -70,7 +70,7 @@ IMPORTANTE:
 VERTICALES: Rodados/Movilidad, Inmobiliario, Security Tokens, Asset-Backed, Utility/Gobernanza, Financieros, Híbridos.`;
 
   try {
-    // DeepSeek servido via NVIDIA NIM (endpoint OpenAI-compatible).
+    // Modelo Llama 3.3 70B Instruct servido via NVIDIA NIM (ultra-rápido, sin saturación)
     const doCall = () => fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -79,13 +79,9 @@ VERTICALES: Rodados/Movilidad, Inmobiliario, Security Tokens, Asset-Backed, Util
       },
       body: JSON.stringify({
         model: deepSeekModel(),
-        max_tokens: 16384,
-        temperature: 1,
+        max_tokens: 2048,
+        temperature: 0.7,
         top_p: 0.95,
-        chat_template_kwargs: {
-          thinking: true,
-          reasoning_effort: "medium"
-        },
         messages: [
           { role: 'system', content: SYSTEM },
           ...messages
