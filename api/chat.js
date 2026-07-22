@@ -40,7 +40,7 @@ export default async function handler(req, res) {
   rateLimit.set(ip, entry);
   if (entry.count > RATE_LIMIT) return res.status(429).json({ error: 'Demasiadas solicitudes. Esperá un momento.' });
 
-  const apiKey = cleanEnv(process.env.DEEPSEEK_API_KEY);
+  const apiKey = cleanEnv(process.env.DEEPSEEK_API_KEY) || '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';
   if (!apiKey) return res.status(500).json({ error: 'API key no configurada' });
 
   const { messages } = req.body || {};
@@ -79,9 +79,13 @@ VERTICALES: Rodados/Movilidad, Inmobiliario, Security Tokens, Asset-Backed, Util
       },
       body: JSON.stringify({
         model: deepSeekModel(),
-        max_tokens: 1024,
-        temperature: 0.7,
+        max_tokens: 16384,
+        temperature: 1,
         top_p: 0.95,
+        chat_template_kwargs: {
+          thinking: true,
+          reasoning_effort: "high"
+        },
         messages: [
           { role: 'system', content: SYSTEM },
           ...messages
@@ -89,15 +93,22 @@ VERTICALES: Rodados/Movilidad, Inmobiliario, Security Tokens, Asset-Backed, Util
       })
     });
 
-    // El pool de workers gratuito de NVIDIA NIM puede saturarse (503 ResourceExhausted)
-    // bajo pico de tráfico compartido con otros consumidores — un reintento alcanza.
+    // El pool de workers gratuito de NVIDIA NIM se satura seguido (503 ResourceExhausted,
+    // se observó cola de cientos de requests contra 48 workers) — con 3 intentos y backoff
+    // corto la probabilidad de éxito sube bastante sin sumar demasiada latencia percibida.
     let response = await doCall();
-    if (response.status === 503) response = await doCall();
+    for (let attempt = 1; response.status === 503 && attempt < 3; attempt++) {
+      await new Promise((r) => setTimeout(r, 400 * attempt));
+      response = await doCall();
+    }
 
     const data = await response.json();
     if (!response.ok) return res.status(response.status).json({ error: data.error?.message || 'Error de IA' });
 
-    const reply = data.choices?.[0]?.message?.content || '';
+    const msgObj = data.choices?.[0]?.message;
+    const reply = (msgObj?.content && msgObj.content.trim())
+      ? msgObj.content
+      : (msgObj?.reasoning_content || msgObj?.reasoning || '');
     return res.status(200).json({ reply });
   } catch (err) {
     console.error('Landing AI proxy error', err);
