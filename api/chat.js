@@ -14,8 +14,10 @@ function cleanEnv(value) {
 }
 
 function deepSeekModel() {
-  const model = cleanEnv(process.env.DEEPSEEK_MODEL) || 'deepseek-v4-flash';
-  return model === 'deepseek-chat' ? 'deepseek-v4-flash' : model;
+  const model = cleanEnv(process.env.DEEPSEEK_MODEL) || 'deepseek-ai/deepseek-v4-flash';
+  return (model === 'deepseek-chat' || model === 'deepseek-v4-flash')
+    ? 'deepseek-ai/deepseek-v4-flash'
+    : model;
 }
 
 export default async function handler(req, res) {
@@ -68,7 +70,8 @@ IMPORTANTE:
 VERTICALES: Rodados/Movilidad, Inmobiliario, Security Tokens, Asset-Backed, Utility/Gobernanza, Financieros, Híbridos.`;
 
   try {
-    const response = await fetch('https://api.deepseek.com/chat/completions', {
+    // DeepSeek servido via NVIDIA NIM (endpoint OpenAI-compatible).
+    const doCall = () => fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -77,12 +80,19 @@ VERTICALES: Rodados/Movilidad, Inmobiliario, Security Tokens, Asset-Backed, Util
       body: JSON.stringify({
         model: deepSeekModel(),
         max_tokens: 1024,
+        temperature: 0.7,
+        top_p: 0.95,
         messages: [
           { role: 'system', content: SYSTEM },
           ...messages
         ]
       })
     });
+
+    // El pool de workers gratuito de NVIDIA NIM puede saturarse (503 ResourceExhausted)
+    // bajo pico de tráfico compartido con otros consumidores — un reintento alcanza.
+    let response = await doCall();
+    if (response.status === 503) response = await doCall();
 
     const data = await response.json();
     if (!response.ok) return res.status(response.status).json({ error: data.error?.message || 'Error de IA' });
