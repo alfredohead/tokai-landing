@@ -66,6 +66,26 @@ REGLAS DE RESPUESTA:
 - Respuestas directas, claras y ágiles. Evitá bloques masivos de texto o explicaciones teóricas extensas.
 - Si el usuario es un Emisor o empresa con un proyecto real, recomendale ingresar a la [Plataforma TOKAI](https://tokairwa.com/platform.html) para completar la encuesta del Wizard de Emisión o contactar a tokairwa@gmail.com / Instagram @tokairwa.`;
 
+  // 1. Intentar primero via backend Fly.io (servidor persistente sin límite de 10s y con fallback a Claude Haiku en ~1.2s)
+  try {
+    const bkController = new AbortController();
+    const bkTimer = setTimeout(() => bkController.abort(), 7500);
+    const bkRes = await fetch('https://tokai-backend.fly.dev/api/v1/ai/public-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages }),
+      signal: bkController.signal
+    });
+    clearTimeout(bkTimer);
+    const bkData = await bkRes.json().catch(() => ({}));
+    if (bkRes.ok && bkData.reply) {
+      return res.status(200).json({ reply: bkData.reply });
+    }
+  } catch (e) {
+    // Si el backend Fly.io falla o demora, continuar con llamadas directas a NVIDIA NIM
+  }
+
+  // 2. Fallback secundario directo a NVIDIA NIM API (con timeout rápido de 4s por candidato para no exceder los 10s de Vercel)
   const NVIDIA_FALLBACK_CHAIN = [
     {
       model: 'meta/llama-3.3-70b-instruct',
@@ -81,11 +101,6 @@ REGLAS DE RESPUESTA:
       model: 'google/gemma-4-31b-it',
       apiKey: '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',
       temp: 0.7, topP: 0.95
-    },
-    {
-      model: 'meta/llama-3.1-70b-instruct',
-      apiKey: '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',
-      temp: 0.2, topP: 0.7
     }
   ];
 
@@ -103,7 +118,7 @@ REGLAS DE RESPUESTA:
     };
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 45000);
+    const timer = setTimeout(() => controller.abort(), 4000);
 
     try {
       const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
@@ -136,28 +151,8 @@ REGLAS DE RESPUESTA:
     } catch (err) {
       clearTimeout(timer);
       lastErr = err;
-      // Continuar al siguiente modelo/key en el fallback chain
     }
   }
 
-  // Fallback secundario de respaldo: backend Fly.io
-  try {
-    const bkController = new AbortController();
-    const bkTimer = setTimeout(() => bkController.abort(), 8000);
-    const bkRes = await fetch('https://tokai-backend.fly.dev/api/v1/ai/public-chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages }),
-      signal: bkController.signal
-    });
-    clearTimeout(bkTimer);
-    const bkData = await bkRes.json().catch(() => ({}));
-    if (bkRes.ok && bkData.reply) {
-      return res.status(200).json({ reply: bkData.reply });
-    }
-  } catch (e) {
-    // Si falla el backend también, devuelve error amigable
-  }
-
-  return res.status(500).json({ error: 'Servicio de consulta no disponible momentáneamente. Intentá de nuevo en unos segundos.' });
+  return res.status(500).json({ error: 'Servicio de consulta no disponible momentáneamente. Intentá de nuevo.' });
 }
