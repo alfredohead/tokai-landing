@@ -93,7 +93,7 @@ REGLAS DE RESPUESTA:
   for (const config of NVIDIA_FALLBACK_CHAIN) {
     const payload = {
       model: config.model,
-      max_tokens: 1024,
+      max_tokens: 512,
       temperature: config.temp,
       top_p: config.topP,
       messages: [
