@@ -21,10 +21,12 @@ function deepSeekModel() {
 }
 
 export default async function handler(req, res) {
-  // CORS restringido al dominio propio
+  // CORS universal para la API pública de la landing
   const origin = req.headers.origin || '';
-  if (ALLOWED_ORIGINS.has(origin) || process.env.NODE_ENV !== 'production') {
-    res.setHeader('Access-Control-Allow-Origin', origin || 'https://tokairwa.com');
+  if (ALLOWED_ORIGINS.has(origin) || process.env.NODE_ENV !== 'production' || !origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
   }
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -39,9 +41,6 @@ export default async function handler(req, res) {
   entry.count++;
   rateLimit.set(ip, entry);
   if (entry.count > RATE_LIMIT) return res.status(429).json({ error: 'Demasiadas solicitudes. Esperá un momento.' });
-
-  const apiKey = cleanEnv(process.env.DEEPSEEK_API_KEY) || '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';
-  if (!apiKey) return res.status(500).json({ error: 'API key no configurada' });
 
   const { messages } = req.body || {};
   if (!Array.isArray(messages) || messages.length === 0 || messages.length > 20) {
@@ -69,28 +68,23 @@ REGLAS DE RESPUESTA:
 
   const NVIDIA_FALLBACK_CHAIN = [
     {
-      model: deepSeekModel(),
-      apiKey: cleanEnv(process.env.DEEPSEEK_API_KEY) || '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',
+      model: 'meta/llama-3.3-70b-instruct',
+      apiKey: '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',
       temp: 0.2, topP: 0.7
     },
     {
       model: 'mistralai/mistral-medium-3.5-128b',
       apiKey: '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',
-      temp: 0.7, topP: 1.0, reasoningEffort: 'high'
+      temp: 0.7, topP: 1.0
     },
     {
       model: 'google/gemma-4-31b-it',
       apiKey: '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',
-      temp: 0.7, topP: 0.95, enableThinking: true
+      temp: 0.7, topP: 0.95
     },
     {
       model: 'meta/llama-3.1-70b-instruct',
       apiKey: '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',
-      temp: 0.2, topP: 0.7
-    },
-    {
-      model: 'meta/llama-3.3-70b-instruct',
-      apiKey: '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',
       temp: 0.2, topP: 0.7
     }
   ];
@@ -108,8 +102,8 @@ REGLAS DE RESPUESTA:
       ]
     };
 
-    if (config.reasoningEffort) payload.reasoning_effort = config.reasoningEffort;
-    if (config.enableThinking) payload.chat_template_kwargs = { thinking: true, enable_thinking: true, reasoning_effort: 'high' };
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
 
     try {
       const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
@@ -119,8 +113,11 @@ REGLAS DE RESPUESTA:
           'Accept': 'application/json',
           'Authorization': `Bearer ${config.apiKey}`
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: controller.signal
       });
+
+      clearTimeout(timer);
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
@@ -137,6 +134,7 @@ REGLAS DE RESPUESTA:
         return res.status(200).json({ reply });
       }
     } catch (err) {
+      clearTimeout(timer);
       lastErr = err;
       // Continuar al siguiente modelo/key en el fallback chain
     }
