@@ -140,5 +140,24 @@ REGLAS DE RESPUESTA:
     }
   }
 
-  return res.status(500).json({ error: lastErr?.message || 'Error al conectar con los servicios de IA.' });
+  // Fallback secundario de respaldo: backend Fly.io
+  try {
+    const bkController = new AbortController();
+    const bkTimer = setTimeout(() => bkController.abort(), 8000);
+    const bkRes = await fetch('https://tokai-backend.fly.dev/api/v1/ai/public-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages }),
+      signal: bkController.signal
+    });
+    clearTimeout(bkTimer);
+    const bkData = await bkRes.json().catch(() => ({}));
+    if (bkRes.ok && bkData.reply) {
+      return res.status(200).json({ reply: bkData.reply });
+    }
+  } catch (e) {
+    // Si falla el backend también, devuelve error amigable
+  }
+
+  return res.status(500).json({ error: 'Servicio de consulta no disponible momentáneamente. Intentá de nuevo en unos segundos.' });
 }
