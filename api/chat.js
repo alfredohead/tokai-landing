@@ -66,10 +66,41 @@ REGLAS DE RESPUESTA:
 - Respuestas directas, claras y ágiles. Evitá bloques masivos de texto o explicaciones teóricas extensas.
 - Si el usuario es un Emisor o empresa con un proyecto real, recomendale ingresar a la [Plataforma TOKAI](https://tokairwa.com/platform.html) para completar la encuesta del Wizard de Emisión o contactar a tokairwa@gmail.com / Instagram @tokairwa.`;
 
-  // 1. Intentar primero via backend Fly.io (servidor persistente sin límite de 10s)
+  // 1. Si existe GROQ_API_KEY en variables de entorno Vercel, llamar directamente a Groq API
+  if (process.env.GROQ_API_KEY) {
+    try {
+      const groqController = new AbortController();
+      const groqTimer = setTimeout(() => groqController.abort(), 6000);
+      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          max_tokens: 512,
+          temperature: 0.3,
+          messages: [{ role: 'system', content: SYSTEM }, ...messages]
+        }),
+        signal: groqController.signal
+      });
+      clearTimeout(groqTimer);
+
+      if (groqRes.ok) {
+        const groqData = await groqRes.json();
+        const reply = groqData.choices?.[0]?.message?.content?.trim();
+        if (reply) return res.status(200).json({ reply });
+      }
+    } catch (e) {
+      // Fallback a backend Fly.io
+    }
+  }
+
+  // 2. Intentar via backend Fly.io (servidor persistente con GROQ_API_KEY cargado en Fly secrets, latencia ~700ms)
   try {
     const bkController = new AbortController();
-    const bkTimer = setTimeout(() => bkController.abort(), 25000);
+    const bkTimer = setTimeout(() => bkController.abort(), 10000);
     const bkRes = await fetch('https://tokai-backend.fly.dev/api/v1/ai/public-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -82,10 +113,10 @@ REGLAS DE RESPUESTA:
       return res.status(200).json({ reply: bkData.reply });
     }
   } catch (e) {
-    // Si el backend Fly.io falla o demora, continuar con llamadas directas a NVIDIA NIM
+    // Continuar a NVIDIA NIM si el backend no responde
   }
 
-  // 2. Fallback secundario directo a NVIDIA NIM API
+  // 3. Backup terciario: NVIDIA NIM direct
   const NVIDIA_FALLBACK_CHAIN = [
     {
       model: 'meta/llama-3.3-70b-instruct',
@@ -96,29 +127,12 @@ REGLAS DE RESPUESTA:
       model: 'mistralai/mistral-medium-3.5-128b',
       apiKey: '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',
       temp: 0.7, topP: 1.0
-    },
-    {
-      model: 'google/gemma-4-31b-it',
-      apiKey: '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',
-      temp: 0.7, topP: 0.95
     }
   ];
 
-  let lastErr = null;
   for (const config of NVIDIA_FALLBACK_CHAIN) {
-    const payload = {
-      model: config.model,
-      max_tokens: 512,
-      temperature: config.temp,
-      top_p: config.topP,
-      messages: [
-        { role: 'system', content: SYSTEM },
-        ...messages
-      ]
-    };
-
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 25000);
+    const timer = setTimeout(() => controller.abort(), 12000);
 
     try {
       const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
@@ -128,31 +142,28 @@ REGLAS DE RESPUESTA:
           'Accept': 'application/json',
           'Authorization': `Bearer ${config.apiKey}`
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          model: config.model,
+          max_tokens: 512,
+          temperature: config.temp,
+          top_p: config.topP,
+          messages: [{ role: 'system', content: SYSTEM }, ...messages]
+        }),
         signal: controller.signal
       });
 
       clearTimeout(timer);
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error?.message || `HTTP ${response.status}`);
-      }
-
-      const data = await response.json();
-      const msgObj = data.choices?.[0]?.message;
-      const reply = (msgObj?.content && msgObj.content.trim())
-        ? msgObj.content
-        : (msgObj?.reasoning_content || msgObj?.reasoning || '');
-
-      if (reply) {
-        return res.status(200).json({ reply });
+      if (response.ok) {
+        const data = await response.json();
+        const msgObj = data.choices?.[0]?.message;
+        const reply = msgObj?.content?.trim();
+        if (reply) return res.status(200).json({ reply });
       }
     } catch (err) {
       clearTimeout(timer);
-      lastErr = err;
     }
   }
 
-  return res.status(500).json({ error: 'Servicio de consulta no disponible momentáneamente. Intentá de nuevo.' });
+  return res.status(500).json({ error: 'Servicio de consulta ocupado momentáneamente. Por favor intentá de nuevo.' });
 }
