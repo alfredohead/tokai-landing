@@ -66,10 +66,10 @@ REGLAS DE RESPUESTA:
 - Respuestas directas, claras y ágiles. Evitá bloques masivos de texto o explicaciones teóricas extensas.
 - Si el usuario es un Emisor o empresa con un proyecto real, recomendale ingresar a la [Plataforma TOKAI](https://tokairwa.com/platform.html) para completar la encuesta del Wizard de Emisión o contactar a tokairwa@gmail.com / Instagram @tokairwa.`;
 
-  // 1. Intentar primero via backend Fly.io (servidor persistente sin límite de 10s y con fallback a Claude Haiku en ~1.2s)
+  // 1. Intentar primero via backend Fly.io (servidor persistente sin límite de 10s)
   try {
     const bkController = new AbortController();
-    const bkTimer = setTimeout(() => bkController.abort(), 7500);
+    const bkTimer = setTimeout(() => bkController.abort(), 25000);
     const bkRes = await fetch('https://tokai-backend.fly.dev/api/v1/ai/public-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -85,7 +85,7 @@ REGLAS DE RESPUESTA:
     // Si el backend Fly.io falla o demora, continuar con llamadas directas a NVIDIA NIM
   }
 
-  // 2. Fallback secundario directo a NVIDIA NIM API (con timeout rápido de 4s por candidato para no exceder los 10s de Vercel)
+  // 2. Fallback secundario directo a NVIDIA NIM API
   const NVIDIA_FALLBACK_CHAIN = [
     {
       model: 'meta/llama-3.3-70b-instruct',
@@ -118,7 +118,7 @@ REGLAS DE RESPUESTA:
     };
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4000);
+    const timer = setTimeout(() => controller.abort(), 25000);
 
     try {
       const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
