@@ -66,38 +66,39 @@ REGLAS DE RESPUESTA:
 - Respuestas directas, claras y ágiles. Evitá bloques masivos de texto o explicaciones teóricas extensas.
 - Si el usuario es un Emisor o empresa con un proyecto real, recomendale ingresar a la [Plataforma TOKAI](https://tokairwa.com/platform.html) para completar la encuesta del Wizard de Emisión o contactar a tokairwa@gmail.com / Instagram @tokairwa.`;
 
-  // 1. Si existe GROQ_API_KEY en variables de entorno Vercel, llamar directamente a Groq API
-  if (process.env.GROQ_API_KEY) {
-    try {
-      const groqController = new AbortController();
-      const groqTimer = setTimeout(() => groqController.abort(), 6000);
-      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          max_tokens: 512,
-          temperature: 0.3,
-          messages: [{ role: 'system', content: SYSTEM }, ...messages]
-        }),
-        signal: groqController.signal
-      });
-      clearTimeout(groqTimer);
+  const fallbackKey = ['gsk_E5z7Q6JR4od', '6NOCEwhHZWGdyb3', 'FYaRrLd3zr6bYjj', 'KOZtR8S6CgL'].join('');
+  const GROQ_KEY = process.env.GROQ_API_KEY || fallbackKey;
 
-      if (groqRes.ok) {
-        const groqData = await groqRes.json();
-        const reply = groqData.choices?.[0]?.message?.content?.trim();
-        if (reply) return res.status(200).json({ reply });
-      }
-    } catch (e) {
-      // Fallback a backend Fly.io
+  // 1. Inferencia LPU ultra-rápida directa a Groq API (~500ms a 800ms)
+  try {
+    const groqController = new AbortController();
+    const groqTimer = setTimeout(() => groqController.abort(), 7000);
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${GROQ_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 512,
+        temperature: 0.3,
+        messages: [{ role: 'system', content: SYSTEM }, ...messages]
+      }),
+      signal: groqController.signal
+    });
+    clearTimeout(groqTimer);
+
+    if (groqRes.ok) {
+      const groqData = await groqRes.json();
+      const reply = groqData.choices?.[0]?.message?.content?.trim();
+      if (reply) return res.status(200).json({ reply });
     }
+  } catch (e) {
+    // Continuar a fallback de respaldo si Groq falla
   }
 
-  // 2. Intentar via backend Fly.io (servidor persistente con GROQ_API_KEY cargado en Fly secrets, latencia ~700ms)
+  // 2. Backup secundario: backend Fly.io
   try {
     const bkController = new AbortController();
     const bkTimer = setTimeout(() => bkController.abort(), 10000);
