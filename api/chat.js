@@ -67,51 +67,80 @@ REGLAS DE RESPUESTA:
 - Respuestas directas, claras y ágiles. Evitá bloques masivos de texto o explicaciones teóricas extensas.
 - Si el usuario es un Emisor o empresa con un proyecto real, recomendale ingresar a la [Plataforma TOKAI](https://tokairwa.com/platform.html) para completar la encuesta del Wizard de Emisión o contactar a tokairwa@gmail.com / Instagram @tokairwa.`;
 
-  try {
-    // Modelo Llama 3.3 70B Instruct servido via NVIDIA NIM (ultra-rápido, sin saturación)
-    const doCall = () => fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: deepSeekModel(),
-        max_tokens: 1024,
-        temperature: 0.2,
-        top_p: 0.7,
-        messages: [
-          { role: 'system', content: SYSTEM },
-          ...messages
-        ]
-      })
-    });
-
-    // Manejar reintentos ante saturación de workers en NVIDIA NIM (429, 500, 502, 503, 504 ResourceExhausted)
-    let response = await doCall();
-    const retryStatuses = [429, 500, 502, 503, 504];
-    for (let attempt = 1; retryStatuses.includes(response.status) && attempt <= 4; attempt++) {
-      const delay = Math.min(500 * Math.pow(1.8, attempt - 1), 3000) + Math.random() * 200;
-      await new Promise((r) => setTimeout(r, delay));
-      response = await doCall();
+  const NVIDIA_FALLBACK_CHAIN = [
+    {
+      model: deepSeekModel(),
+      apiKey: cleanEnv(process.env.DEEPSEEK_API_KEY) || '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',
+      temp: 0.2, topP: 0.7
+    },
+    {
+      model: 'mistralai/mistral-medium-3.5-128b',
+      apiKey: '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',
+      temp: 0.7, topP: 1.0, reasoningEffort: 'high'
+    },
+    {
+      model: 'google/gemma-4-31b-it',
+      apiKey: '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',
+      temp: 0.7, topP: 0.95, enableThinking: true
+    },
+    {
+      model: 'meta/llama-3.1-70b-instruct',
+      apiKey: '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',
+      temp: 0.2, topP: 0.7
+    },
+    {
+      model: 'meta/llama-3.3-70b-instruct',
+      apiKey: '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',
+      temp: 0.2, topP: 0.7
     }
+  ];
 
-    const data = await response.json();
-    if (!response.ok) {
-      const isRateLimit = response.status === 429 || response.status === 503 || (data.error?.message || '').includes('limit');
-      const errorMsg = isRateLimit
-        ? 'El servidor de IA está recibiendo alta demanda en este momento (límite de workers alcanzado). Por favor reintentá en unos segundos.'
-        : (data.error?.message || 'Error de IA');
-      return res.status(response.status).json({ error: errorMsg });
+  let lastErr = null;
+  for (const config of NVIDIA_FALLBACK_CHAIN) {
+    const payload = {
+      model: config.model,
+      max_tokens: 1024,
+      temperature: config.temp,
+      top_p: config.topP,
+      messages: [
+        { role: 'system', content: SYSTEM },
+        ...messages
+      ]
+    };
+
+    if (config.reasoningEffort) payload.reasoning_effort = config.reasoningEffort;
+    if (config.enableThinking) payload.chat_template_kwargs = { thinking: true, enable_thinking: true, reasoning_effort: 'high' };
+
+    try {
+      const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${config.apiKey}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      const msgObj = data.choices?.[0]?.message;
+      const reply = (msgObj?.content && msgObj.content.trim())
+        ? msgObj.content
+        : (msgObj?.reasoning_content || msgObj?.reasoning || '');
+
+      if (reply) {
+        return res.status(200).json({ reply });
+      }
+    } catch (err) {
+      lastErr = err;
+      // Continuar al siguiente modelo/key en el fallback chain
     }
-
-    const msgObj = data.choices?.[0]?.message;
-    const reply = (msgObj?.content && msgObj.content.trim())
-      ? msgObj.content
-      : (msgObj?.reasoning_content || msgObj?.reasoning || '');
-    return res.status(200).json({ reply });
-  } catch (err) {
-    console.error('Landing AI proxy error', err);
-    return res.status(500).json({ error: 'Error interno. Intentá de nuevo.' });
   }
+
+  return res.status(500).json({ error: lastErr?.message || 'Error al conectar con los servicios de IA.' });
 }
