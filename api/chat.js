@@ -103,7 +103,7 @@ REGLAS DE RESPUESTA:
     };
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
+    const timer = setTimeout(() => controller.abort(), 45000);
 
     try {
       const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
