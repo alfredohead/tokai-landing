@@ -1683,6 +1683,36 @@ function InvestorOnboardingCard({project, wallet, toast}){
             busy?'Enviando…':'② Registrar orden de suscripción →')));
 }
 
+/* ─── GeofencingRestrictedScreen: pantalla de bloqueo compartida por      ───
+   InvestView y AssetDetail — antes duplicada byte a byte en ambos lugares.
+   Un único origen evita que las dos superficies diverjan con el tiempo. */
+function GeofencingRestrictedScreen({userJur,toast,onBack}){
+  return h('div', {style:{maxWidth:640, margin:'0 auto', paddingTop:40}},
+    h('div', {className:'card', style:{borderColor:'var(--red)', background:'rgba(255, 92, 92, 0.03)', padding:'40px 32px', textAlign:'center', borderRadius:16}},
+      h(Icon, {d:I.shield, 'aria-hidden':'true', style:{width:64, height:64, color:'var(--red)', marginBottom:20}}),
+      h('h1', {style:{fontSize:22, fontWeight:800, color:'var(--red)', marginBottom:12}}, 'Acceso Restringido por Geofencing'),
+      h('p', {style:{fontSize:14, lineHeight:1.6, color:'var(--txt)', marginBottom:24}},
+        `Tu jurisdicción detectada (${JUR[userJur] || 'ISO '+userJur}) se encuentra actualmente restringida para la oferta y suscripción de este activo digital RWA.`
+      ),
+      h('div', {className:'card', style:{background:'var(--black)', padding:16, border:'1.5px dashed rgba(255, 92, 92, 0.2)', marginBottom:24, textAlign:'left'}},
+        h('h4', {style:{fontSize:13, fontWeight:700, color:'var(--red)', marginBottom:6}}, 'Cumplimiento Normativo (Compliance Gate)'),
+        h('p', {className:'muted', style:{fontSize:12, lineHeight:1.5}},
+          'De acuerdo con las regulaciones de la CNV argentina, la SEC de EE.UU. (Reg D) y normativas de prevención contra el lavado de dinero de GAFI, la oferta pública de este activo no está autorizada para inversores de tu región geográfica actual.'
+        )
+      ),
+      h('div', {style:{display:'flex', gap:12, justifyContent:'center'}},
+        h('button', {className:'btn btn-ghost', onClick:onBack}, '← Volver al Portal'),
+        h('button', {className:'btn btn-primary', style:{background:'var(--red)', border:'none'}, onClick:()=>{
+          toast({
+            title: 'Soporte Normativo',
+            msg: 'Por consultas de acreditación internacional, ponete en contacto con compliance@tokai.com.'
+          });
+        }}, 'Contactar Compliance')
+      )
+    )
+  );
+}
+
 function InvestView({chain,wallet,projectId,toast}){
   const userJur = (chain.identities[wallet.addr]?.jur) || wallet.jur;
   const globallyBlocked = chain.blockedJurisdictions.includes(userJur);
@@ -1729,30 +1759,7 @@ function InvestView({chain,wallet,projectId,toast}){
   },[verified, pid, projectId]);
 
   if (wallet.role !== 'admin' && isGeofenced) {
-    return h('div', {style:{maxWidth:640, margin:'0 auto', paddingTop:40}},
-      h('div', {className:'card', style:{borderColor:'var(--red)', background:'rgba(255, 92, 92, 0.03)', padding:'40px 32px', textAlign:'center', borderRadius:16}},
-        h(Icon, {d:I.shield, style:{width:64, height:64, color:'var(--red)', marginBottom:20}}),
-        h('h1', {style:{fontSize:22, fontWeight:800, color:'var(--red)', marginBottom:12}}, 'Acceso Restringido por Geofencing'),
-        h('p', {style:{fontSize:14, lineHeight:1.6, color:'var(--txt)', marginBottom:24}},
-          `Tu jurisdicción detectada (${JUR[userJur] || 'ISO '+userJur}) se encuentra actualmente restringida para la oferta y suscripción de este activo digital RWA.`
-        ),
-        h('div', {className:'card', style:{background:'var(--black)', padding:16, border:'1.5px dashed rgba(255, 92, 92, 0.2)', marginBottom:24, textAlign:'left'}},
-          h('h4', {style:{fontSize:13, fontWeight:700, color:'var(--red)', marginBottom:6}}, 'Cumplimiento Normativo (Compliance Gate)'),
-          h('p', {className:'muted', style:{fontSize:12, lineHeight:1.5}},
-            'De acuerdo con las regulaciones de la CNV argentina, la SEC de EE.UU. (Reg D) y normativas de prevención contra el lavado de dinero de GAFI, la oferta pública de este activo no está autorizada para inversores de tu región geográfica actual.'
-          )
-        ),
-        h('div', {style:{display:'flex', gap:12, justifyContent:'center'}},
-          h('a', {className:'btn btn-ghost', href:'#/dash'}, '← Volver al Portal'),
-          h('button', {className:'btn btn-primary', style:{background:'var(--red)', border:'none'}, onClick:()=>{
-            toast({
-              title: 'Soporte Normativo',
-              msg: 'Por consultas de acreditación internacional, ponete en contacto con compliance@tokai.com.'
-            });
-          }}, 'Contactar Compliance')
-        )
-      )
-    );
+    return h(GeofencingRestrictedScreen, {userJur, toast, onBack: function(){ window.location.hash = '#/dash'; }});
   }
 
   const steps=['Proyecto','Verificación KYC','Fondeo','Suscripción'];
@@ -2426,30 +2433,7 @@ function AssetDetail({chain,wallet,pid,toast,go}){
   const [tokens,setTokens] = useState(10);
 
   if (wallet.role !== 'admin' && isGeofenced) {
-    return h('div', {style:{maxWidth:640, margin:'0 auto', paddingTop:40}},
-      h('div', {className:'card', style:{borderColor:'var(--red)', background:'rgba(255, 92, 92, 0.03)', padding:'40px 32px', textAlign:'center', borderRadius:16}},
-        h(Icon, {d:I.shield, style:{width:64, height:64, color:'var(--red)', marginBottom:20}}),
-        h('h1', {style:{fontSize:22, fontWeight:800, color:'var(--red)', marginBottom:12}}, 'Acceso Restringido por Geofencing'),
-        h('p', {style:{fontSize:14, lineHeight:1.6, color:'var(--txt)', marginBottom:24}},
-          `Tu jurisdicción detectada (${JUR[userJur] || 'ISO '+userJur}) se encuentra actualmente restringida para la oferta y suscripción de este activo digital RWA.`
-        ),
-        h('div', {className:'card', style:{background:'var(--black)', padding:16, border:'1.5px dashed rgba(255, 92, 92, 0.2)', marginBottom:24, textAlign:'left'}},
-          h('h4', {style:{fontSize:13, fontWeight:700, color:'var(--red)', marginBottom:6}}, 'Cumplimiento Normativo (Compliance Gate)'),
-          h('p', {className:'muted', style:{fontSize:12, lineHeight:1.5}},
-            'De acuerdo con las regulaciones de la CNV argentina, la SEC de EE.UU. (Reg D) y normativas de prevención contra el lavado de dinero de GAFI, la oferta pública de este activo no está autorizada para inversores de tu región geográfica actual.'
-          )
-        ),
-        h('div', {style:{display:'flex', gap:12, justifyContent:'center'}},
-          h('button', {className:'btn btn-ghost', onClick:()=>go('dash')}, '← Volver al Portal'),
-          h('button', {className:'btn btn-primary', style:{background:'var(--red)', border:'none'}, onClick:()=>{
-            toast({
-              title: 'Soporte Normativo',
-              msg: 'Por consultas de acreditación internacional, ponete en contacto con compliance@tokai.com.'
-            });
-          }}, 'Contactar Compliance')
-        )
-      )
-    );
+    return h(GeofencingRestrictedScreen, {userJur, toast, onBack: function(){ go('dash'); }});
   }
 
   const profile = profiles.find(x=>x.key===profileKey) || profiles[0] || null;
@@ -2847,6 +2831,7 @@ function AdminGeofencing({chain, toast}){
           h('button', {
             className: 'btn ' + (isBlocked ? 'btn-primary' : 'btn-ghost'),
             style: isBlocked ? {background:'var(--red)', border:'none'} : {},
+            'aria-pressed': isBlocked,
             onClick: () => {
               chain.toggleJurisdictionBlock(c.code);
               toast({
@@ -6321,22 +6306,22 @@ function KycIssuerFlow({ project, walletAddr, chain, onComplete, onError }) {
       'El emisor asume la responsabilidad de haber verificado la identidad del suscriptor por sus propios medios (evento presencial, RRSS verificada, documentacion fisica).'),
     h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 } },
       h('div', {},
-        h('label', { style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Nombre *'),
-        h('input', { style: inp, value: form.nombre, placeholder: 'Juan', onChange: function(e) { setForm(function(f){ return Object.assign({}, f, {nombre: e.target.value}); }); } })),
+        h('label', { htmlFor: 'kyc-issuer-nombre', style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Nombre *'),
+        h('input', { id: 'kyc-issuer-nombre', style: inp, value: form.nombre, placeholder: 'Juan', onChange: function(e) { setForm(function(f){ return Object.assign({}, f, {nombre: e.target.value}); }); } })),
       h('div', {},
-        h('label', { style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Apellido'),
-        h('input', { style: inp, value: form.apellido, placeholder: 'Perez', onChange: function(e) { setForm(function(f){ return Object.assign({}, f, {apellido: e.target.value}); }); } }))),
+        h('label', { htmlFor: 'kyc-issuer-apellido', style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Apellido'),
+        h('input', { id: 'kyc-issuer-apellido', style: inp, value: form.apellido, placeholder: 'Perez', onChange: function(e) { setForm(function(f){ return Object.assign({}, f, {apellido: e.target.value}); }); } }))),
     h('div', { style: { display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10, marginBottom: 10 } },
       h('div', {},
-        h('label', { style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Tipo'),
-        h('select', { style: inp, value: form.docTipo, onChange: function(e) { setForm(function(f){ return Object.assign({}, f, {docTipo: e.target.value}); }); } },
+        h('label', { htmlFor: 'kyc-issuer-doctipo', style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Tipo'),
+        h('select', { id: 'kyc-issuer-doctipo', style: inp, value: form.docTipo, onChange: function(e) { setForm(function(f){ return Object.assign({}, f, {docTipo: e.target.value}); }); } },
           ['DNI','Pasaporte','CUIT','CE'].map(function(t){ return h('option', { key: t, value: t }, t); }))),
       h('div', {},
-        h('label', { style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Numero de documento *'),
-        h('input', { style: inp, value: form.docNum, placeholder: '30.123.456', onChange: function(e) { setForm(function(f){ return Object.assign({}, f, {docNum: e.target.value}); }); } }))),
+        h('label', { htmlFor: 'kyc-issuer-docnum', style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Numero de documento *'),
+        h('input', { id: 'kyc-issuer-docnum', style: inp, value: form.docNum, placeholder: '30.123.456', onChange: function(e) { setForm(function(f){ return Object.assign({}, f, {docNum: e.target.value}); }); } }))),
     h('div', { style: { marginBottom: 14 } },
-      h('label', { style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Nota: como verifico la identidad'),
-      h('textarea', { style: Object.assign({}, inp, { resize: 'vertical', minHeight: 56, lineHeight: 1.5 }), value: form.nota, placeholder: 'Ej: Verificado en evento presencial 15/06/2026 · Documento revisado personalmente', onChange: function(e) { setForm(function(f){ return Object.assign({}, f, {nota: e.target.value}); }); } })),
+      h('label', { htmlFor: 'kyc-issuer-nota', style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Nota: como verifico la identidad'),
+      h('textarea', { id: 'kyc-issuer-nota', style: Object.assign({}, inp, { resize: 'vertical', minHeight: 56, lineHeight: 1.5 }), value: form.nota, placeholder: 'Ej: Verificado en evento presencial 15/06/2026 · Documento revisado personalmente', onChange: function(e) { setForm(function(f){ return Object.assign({}, f, {nota: e.target.value}); }); } })),
     h('div', { style: { fontSize: 11, color: 'var(--txt-mute)', marginBottom: 12 } }, 'Solo el hash SHA-256 de estos datos se registra on-chain. Los datos se eliminan del cliente despues del registro.'),
     h('button', { className: 'btn btn-primary', onClick: confirmKyc, disabled: saving || !form.nombre || !form.docNum },
       saving ? 'Registrando...' : 'Confirmar identidad y registrar'));
@@ -6360,12 +6345,12 @@ function KycDemoFlow({ project, walletAddr, chain, onComplete }) {
     h('div', { style: { fontWeight: 700, fontSize: 13, marginBottom: 8 } }, 'KYC simulado (modo demo)'),
     h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 } },
       h('div', {},
-        h('label', { style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Jurisdiccion'),
-        h('select', { value: jur, onChange: function(e){ setJur(+e.target.value); }, style: { width: '100%', padding: '8px', borderRadius: 8, border: '1px solid var(--line-solid)', background: 'var(--black)', color: 'var(--txt)', fontSize: 12 } },
+        h('label', { htmlFor: 'kyc-demo-jur', style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Jurisdiccion'),
+        h('select', { id: 'kyc-demo-jur', value: jur, onChange: function(e){ setJur(+e.target.value); }, style: { width: '100%', padding: '8px', borderRadius: 8, border: '1px solid var(--line-solid)', background: 'var(--black)', color: 'var(--txt)', fontSize: 12 } },
           Object.entries(JUR).map(function(kv){ return h('option', { key: kv[0], value: +kv[0] }, kv[1]); }))),
       h('div', {},
-        h('label', { style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Categoria'),
-        h('select', { value: cat, onChange: function(e){ setCat(+e.target.value); }, style: { width: '100%', padding: '8px', borderRadius: 8, border: '1px solid var(--line-solid)', background: 'var(--black)', color: 'var(--txt)', fontSize: 12 } },
+        h('label', { htmlFor: 'kyc-demo-cat', style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Categoria'),
+        h('select', { id: 'kyc-demo-cat', value: cat, onChange: function(e){ setCat(+e.target.value); }, style: { width: '100%', padding: '8px', borderRadius: 8, border: '1px solid var(--line-solid)', background: 'var(--black)', color: 'var(--txt)', fontSize: 12 } },
           Object.entries(CAT).map(function(kv){ return h('option', { key: kv[0], value: +kv[0] }, kv[1]); })))),
     h('button', { className: 'btn btn-primary', onClick: confirm }, 'Registrar KYC demo'));
 }
@@ -6431,7 +6416,7 @@ function KycGate({ project, walletAddr, chain, toast, onComplete }) {
     h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14 } },
       h('span', { style: { padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: modeInfo.color+'18', color: modeInfo.color, border: '1px solid '+modeInfo.color+'40' } }, modeInfo.label),
       h('span', { style: { fontSize: 11, color: 'var(--txt-mute)' } }, modeInfo.desc)),
-    error ? h('div', { style: { padding: '10px 12px', borderRadius: 8, background: 'rgba(255,92,92,.08)', border: '1px solid rgba(255,92,92,.25)', color: '#FF5C5C', fontSize: 12, marginBottom: 12 } }, error) : null,
+    error ? h('div', { role: 'alert', 'aria-live': 'polite', style: { padding: '10px 12px', borderRadius: 8, background: 'rgba(255,92,92,.08)', border: '1px solid rgba(255,92,92,.25)', color: '#FF5C5C', fontSize: 12, marginBottom: 12 } }, error) : null,
     mode === 'psav'   ? h(KycPsavFlow,   { project: project, walletAddr: walletAddr, onComplete: handleComplete, onError: handleError }) : null,
     mode === 'issuer' ? h(KycIssuerFlow, { project: project, walletAddr: walletAddr, chain: chain, onComplete: handleComplete, onError: handleError }) : null,
     mode === 'demo'   ? h(KycDemoFlow,   { project: project, walletAddr: walletAddr, chain: chain, onComplete: handleComplete }) : null);
@@ -8525,14 +8510,21 @@ function PreGATInvestorCard({ walletAddr, toast }) {
    gas reales. Requiere confirmación explícita — ver punto 4 de la auditoría
    de flujo (tasks.md #33/agent_sync). */
 function RealModeConfirmModal({onCancel,onConfirm}){
+  var cancelRef = useRef(null);
+  useEffect(function(){
+    cancelRef.current && cancelRef.current.focus();
+    function onKeyDown(e){ if(e.key === 'Escape') onCancel(); }
+    document.addEventListener('keydown', onKeyDown);
+    return function(){ document.removeEventListener('keydown', onKeyDown); };
+  }, []);
   return h('div',{style:{position:'fixed',inset:0,background:'rgba(0,0,0,.72)',backdropFilter:'blur(10px)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:20}},
-    h('div',{style:{maxWidth:440,width:'100%',background:'linear-gradient(145deg,rgba(16,20,32,.97),rgba(10,14,24,.99))',border:'1px solid rgba(255,178,62,.25)',boxShadow:'0 0 0 1px rgba(255,255,255,.04),0 32px 80px rgba(0,0,0,.7)',borderRadius:20,padding:28}},
-      h('div',{style:{fontSize:28,marginBottom:10}},'⚠️'),
-      h('div',{style:{fontWeight:800,fontSize:16,marginBottom:8}},'Vas a pasar a modo Real'),
-      h('p',{style:{fontSize:13,color:'var(--txt-dim)',lineHeight:1.6,marginBottom:18}},
+    h('div',{role:'alertdialog','aria-modal':'true','aria-labelledby':'real-mode-title','aria-describedby':'real-mode-desc',style:{maxWidth:440,width:'100%',background:'linear-gradient(145deg,rgba(16,20,32,.97),rgba(10,14,24,.99))',border:'1px solid rgba(255,178,62,.25)',boxShadow:'0 0 0 1px rgba(255,255,255,.04),0 32px 80px rgba(0,0,0,.7)',borderRadius:20,padding:28}},
+      h('div',{'aria-hidden':'true',style:{fontSize:28,marginBottom:10}},'⚠️'),
+      h('div',{id:'real-mode-title',style:{fontWeight:800,fontSize:16,marginBottom:8}},'Vas a pasar a modo Real'),
+      h('p',{id:'real-mode-desc',style:{fontSize:13,color:'var(--txt-dim)',lineHeight:1.6,marginBottom:18}},
         'A partir de acá, invertir, reclamar renta, operar en el mercado OTC o desplegar un token va a firmar transacciones con fondos y gas reales en la red conectada. No es una simulación y no siempre es reversible.'),
       h('div',{style:{display:'flex',gap:10,justifyContent:'flex-end'}},
-        h('button',{className:'btn btn-ghost',onClick:onCancel},'Cancelar, seguir en Demo'),
+        h('button',{ref:cancelRef,className:'btn btn-ghost',onClick:onCancel},'Cancelar, seguir en Demo'),
         h('button',{className:'btn btn-primary',style:{background:'#FFB23E',borderColor:'#FFB23E',color:'#0A0A0A'},onClick:onConfirm},'Sí, operar en modo real'))));
 }
 
