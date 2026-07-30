@@ -7282,6 +7282,14 @@ function AdminAccesos({ chain, toast }) {
       .then(function(d){ setPagos(d.data || []); })
       .catch(function(){});
   }
+  var [projects, setProjects] = useState([]);
+  function loadProjects(){
+    if(!API) return;
+    fetch(API + '/projects', { credentials: 'include' })
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
+      .then(function(d){ setProjects(d.projects || []); })
+      .catch(function(){});
+  }
   var [kycRows, setKycRows] = useState([]);
   var [kycCategoryDraft, setKycCategoryDraft] = useState({}); // id -> 1|2|3, elegido por TOKAI antes de aprobar
   var [investRows, setInvestRows] = useState([]);
@@ -7299,7 +7307,7 @@ function AdminAccesos({ chain, toast }) {
       .then(function(d){ setInvestRows(d.data || []); })
       .catch(function(){});
   }
-  useEffect(function(){ loadSolicitudes(); loadPagos(); loadKyc(); loadInvest(); }, []);
+  useEffect(function(){ loadSolicitudes(); loadPagos(); loadKyc(); loadInvest(); loadProjects(); }, []);
 
   /* Con backend: solicitudes reales de contact_requests. Sin backend: fallback demo. */
   var solicitudes   = backendRows !== null ? backendRows : (chain.solicitudes || []);
@@ -7366,6 +7374,19 @@ function AdminAccesos({ chain, toast }) {
       .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
       .then(function(){ loadPagos(); toast && toast({ title: 'Pago confirmado', msg: 'El pago quedó registrado como confirmado.' }); })
       .catch(function(){ toast && toast({ type: 'err', title: 'Error', msg: 'No se pudo confirmar el pago.' }); });
+  }
+  function toggleProjectEnabled(id, enabled) {
+    if (!API) { toast && toast({ title: enabled ? 'Avance habilitado' : 'Avance deshabilitado', msg: 'Simulado (demo).' }); return; }
+    fetch(API + '/admin/projects/' + id + '/enable', { method: 'PATCH', credentials: 'include', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ enabled: enabled }) })
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
+      .then(function(){
+        loadProjects();
+        toast && toast({
+          title: enabled ? 'Avance habilitado' : 'Avance deshabilitado',
+          msg: enabled ? 'El emisor ya puede avanzar de ronda.' : 'El emisor no podrá avanzar de ronda hasta que TOKAI lo vuelva a habilitar.'
+        });
+      })
+      .catch(function(){ toast && toast({ type: 'err', title: 'Error', msg: 'No se pudo actualizar el estado de habilitación.' }); });
   }
   function reviewKycEntry(id, action) {
     if (!API) return;
@@ -7537,32 +7558,87 @@ function AdminAccesos({ chain, toast }) {
           }))));
     })(),
 
-    /* ── Tab Pagos notificados por emisores ── */
+    /* ── Tab Pagos notificados por emisores + gate de gobernanza TOKAI ── */
     tab === 'pagos' && (function() {
-      if (pagos.length === 0) return h('div', { className: 'card', style: { padding: '40px', textAlign: 'center', color: 'var(--txt-mute)' } },
-        h('div', { style: { fontSize: 28, marginBottom: 12 } }, '💳'),
-        h('div', { style: { fontSize: 14 } }, API ? 'No hay pagos notificados.' : 'Sin conexión al backend — los pagos reales aparecen acá.'));
-      return h('div', { className: 'card', style: { padding: 0, overflowX: 'auto' } },
-        h('table', { style: { width: '100%', borderCollapse: 'collapse' } },
-          h('thead', {},
-            h('tr', {}, ['Emisor', 'Método', 'Monto', 'Referencia', 'Fecha', 'Estado / Acción'].map(function(col) {
-              return h('th', { key: col, style: { padding: '10px 12px', textAlign: 'left', fontSize: 11, color: 'var(--txt-mute)', textTransform: 'uppercase', letterSpacing: '.05em', borderBottom: '1px solid var(--line-solid)', background: 'rgba(255,255,255,.02)' } }, col);
-            }))),
-          h('tbody', {}, pagos.map(function(p) {
-            var mLabel = (PAYMENT_METHODS.find(function(m){ return m.id === p.method; }) || {}).label || p.method;
-            return h('tr', { key: p.id },
-              h('td', { style: cell }, h('div', { style: { fontSize: 12, color: 'var(--emerald)' } }, p.email || p.user_id || '—')),
-              h('td', { style: cell }, mLabel),
-              h('td', { style: cell }, p.amount_usd ? ('USD ' + p.amount_usd + (p.currency ? ' · ' + p.currency : '')) : '—'),
-              h('td', { style: { ...cell, fontFamily: 'var(--mono)', fontSize: 11 } }, p.reference || '—'),
-              h('td', { style: { ...cell, fontSize: 11 } }, p.created_at ? new Date(p.created_at).toLocaleDateString('es-AR') : '—'),
-              h('td', { style: cell },
-                p.status === 'pending'
-                  ? h('button', { className: 'btn btn-primary btn-sm', style: { fontSize: 11 }, onClick: function(){ confirmarPago(p.id); } }, '✓ Confirmar pago')
-                  : h('span', { style: { padding: '3px 8px', borderRadius: 7, fontSize: 11, fontWeight: 700,
-                      background: p.status === 'confirmed' ? 'rgba(0,214,126,.15)' : 'rgba(255,92,92,.12)',
-                      color: p.status === 'confirmed' ? 'var(--emerald)' : '#FF5C5C' } }, p.status.toUpperCase())));
-          }))));
+      var paymentsTable = pagos.length === 0
+        ? h('div', { className: 'card', style: { padding: '40px', textAlign: 'center', color: 'var(--txt-mute)' } },
+            h('div', { style: { fontSize: 28, marginBottom: 12 } }, '💳'),
+            h('div', { style: { fontSize: 14 } }, API ? 'No hay pagos notificados.' : 'Sin conexión al backend — los pagos reales aparecen acá.'))
+        : h('div', { className: 'card', style: { padding: 0, overflowX: 'auto' } },
+            h('table', { style: { width: '100%', borderCollapse: 'collapse' } },
+              h('thead', {},
+                h('tr', {}, ['Emisor', 'Método', 'Monto', 'Referencia', 'Fecha', 'Estado / Acción'].map(function(col) {
+                  return h('th', { key: col, style: { padding: '10px 12px', textAlign: 'left', fontSize: 11, color: 'var(--txt-mute)', textTransform: 'uppercase', letterSpacing: '.05em', borderBottom: '1px solid var(--line-solid)', background: 'rgba(255,255,255,.02)' } }, col);
+                }))),
+              h('tbody', {}, pagos.map(function(p) {
+                var mLabel = (PAYMENT_METHODS.find(function(m){ return m.id === p.method; }) || {}).label || p.method;
+                return h('tr', { key: p.id },
+                  h('td', { style: cell }, h('div', { style: { fontSize: 12, color: 'var(--emerald)' } }, p.email || p.user_id || '—')),
+                  h('td', { style: cell }, mLabel),
+                  h('td', { style: cell }, p.amount_usd ? ('USD ' + p.amount_usd + (p.currency ? ' · ' + p.currency : '')) : '—'),
+                  h('td', { style: { ...cell, fontFamily: 'var(--mono)', fontSize: 11 } }, p.reference || '—'),
+                  h('td', { style: { ...cell, fontSize: 11 } }, p.created_at ? new Date(p.created_at).toLocaleDateString('es-AR') : '—'),
+                  h('td', { style: cell },
+                    p.status === 'pending'
+                      ? h('button', { className: 'btn btn-primary btn-sm', style: { fontSize: 11 }, onClick: function(){ confirmarPago(p.id); } }, '✓ Confirmar pago')
+                      : h('span', { style: { padding: '3px 8px', borderRadius: 7, fontSize: 11, fontWeight: 700,
+                          background: p.status === 'confirmed' ? 'rgba(0,214,126,.15)' : 'rgba(255,92,92,.12)',
+                          color: p.status === 'confirmed' ? 'var(--emerald)' : '#FF5C5C' } }, p.status.toUpperCase())));
+              }))));
+
+      function latestPaymentFor(email) {
+        if (!email) return null;
+        var rows = pagos.filter(function(p){ return p.email === email; });
+        if (rows.length === 0) return null;
+        rows.sort(function(a, b){ return new Date(b.created_at || 0) - new Date(a.created_at || 0); });
+        return rows[0];
+      }
+      var PAYMENT_CONTEXT_STYLE = {
+        pending:   { bg: 'rgba(255,178,62,.12)', fg: '#FFB23E', label: 'PAGO PENDIENTE' },
+        confirmed: { bg: 'rgba(0,214,126,.15)',  fg: 'var(--emerald)', label: 'PAGO CONFIRMADO' },
+        rejected:  { bg: 'rgba(255,92,92,.12)',  fg: '#FF5C5C', label: 'PAGO RECHAZADO' },
+      };
+      function paymentContextBadge(email) {
+        var payment = latestPaymentFor(email);
+        var s = payment ? (PAYMENT_CONTEXT_STYLE[payment.status] || PAYMENT_CONTEXT_STYLE.pending) : { bg: 'var(--panel2)', fg: 'var(--txt-mute)', label: 'SIN PAGO REGISTRADO' };
+        return h('span', {
+          style: { padding: '3px 8px', borderRadius: 7, fontSize: 10.5, fontWeight: 700, background: s.bg, color: s.fg },
+          title: 'Dato de contexto para la decisión de TOKAI — no habilita ni bloquea el avance automáticamente'
+        }, s.label);
+      }
+
+      var governanceTable = h('div', { className: 'card', style: { padding: '12px 14px', marginTop: 20, marginBottom: 12, borderLeft: '3px solid var(--emerald)' } },
+        h('div', { style: { fontWeight: 800, fontSize: 13, marginBottom: 4 } }, 'Habilitación de avance — gobernanza TOKAI'),
+        h('div', { style: { color: 'var(--txt-dim)', fontSize: 12, lineHeight: 1.55 } }, 'TOKAI decide cuándo un proyecto puede avanzar de ronda. El estado de pago es solo referencia — no habilita ni bloquea nada automáticamente; podés avanzar un proyecto con pago parcial acordado, o frenarlo aunque esté pagado.')
+      );
+
+      var governanceBody = projects.length === 0
+        ? h('div', { className: 'card', style: { padding: '40px', textAlign: 'center', color: 'var(--txt-mute)' } },
+            h('div', { style: { fontSize: 28, marginBottom: 12 } }, '🗂️'),
+            h('div', { style: { fontSize: 14 } }, API ? 'No hay proyectos creados todavía.' : 'Sin conexión al backend — los proyectos reales aparecen acá.'))
+        : h('div', { className: 'card', style: { padding: 0, overflowX: 'auto' } },
+            h('table', { style: { width: '100%', borderCollapse: 'collapse' } },
+              h('thead', {},
+                h('tr', {}, ['Proyecto', 'Emisor', 'Pago (contexto)', 'Estado TOKAI', 'Acción'].map(function(col) {
+                  return h('th', { key: col, style: { padding: '10px 12px', textAlign: 'left', fontSize: 11, color: 'var(--txt-mute)', textTransform: 'uppercase', letterSpacing: '.05em', borderBottom: '1px solid var(--line-solid)', background: 'rgba(255,255,255,.02)' } }, col);
+                }))),
+              h('tbody', {}, projects.map(function(p) {
+                var enabled = p.project_enabled_by_tokai === true;
+                return h('tr', { key: p.id },
+                  h('td', { style: cell }, h('b', {}, p.name), h('div', { style: { fontFamily: 'var(--mono)', fontSize: 10.5, marginTop: 2 } }, p.symbol)),
+                  h('td', { style: cell }, h('span', { style: { fontSize: 12, color: 'var(--emerald)' } }, p.owner_email || '—')),
+                  h('td', { style: cell }, paymentContextBadge(p.owner_email)),
+                  h('td', { style: cell },
+                    h('span', { style: { padding: '3px 8px', borderRadius: 7, fontSize: 10.5, fontWeight: 700,
+                        background: enabled ? 'rgba(0,214,126,.15)' : 'var(--panel2)',
+                        color: enabled ? 'var(--emerald)' : 'var(--txt-mute)' } }, enabled ? '✓ HABILITADO' : 'NO HABILITADO')),
+                  h('td', { style: cell },
+                    enabled
+                      ? h('button', { className: 'btn btn-ghost btn-sm', style: { fontSize: 11, color: '#FF5C5C', borderColor: 'rgba(255,92,92,.3)' }, onClick: function(){ toggleProjectEnabled(p.id, false); } }, 'Deshabilitar')
+                      : h('button', { className: 'btn btn-primary btn-sm', style: { fontSize: 11 }, onClick: function(){ toggleProjectEnabled(p.id, true); } }, 'Habilitar avance')));
+              }))));
+
+      return h('div', {}, paymentsTable, governanceTable, governanceBody);
     })(),
 
     /* ── Tab Solicitudes de emisores ── */
@@ -8495,8 +8571,14 @@ function App(){
   }, [apiUrl]);
 
   const sim = useChain({apiUrl, loggedIn: !!auth});
-  const web3 = (typeof useWeb3==='function') ? useWeb3() : { available:false };
-  const live = (typeof useChainWeb3==='function') ? useChainWeb3(web3.account) : null;
+  // useWeb3/useChainWeb3 vienen de tokai-web3.js (script global, puede no cargar en demo).
+  // La selección de implementación no puede resolverse dentro del call de un hook
+  // (viola react-hooks/rules-of-hooks) — se elige la referencia de función antes,
+  // y el hook se llama siempre sin condicional, preservando el mismo fallback.
+  const useWeb3Impl = typeof useWeb3 === 'function' ? useWeb3 : function(){ return { available:false }; };
+  const useChainWeb3Impl = typeof useChainWeb3 === 'function' ? useChainWeb3 : function(){ return null; };
+  const web3 = useWeb3Impl();
+  const live = useChainWeb3Impl(web3.account);
   const liveModeEnabled = (typeof window !== 'undefined') && window.__TOKAI_ENABLE_LIVE_MODE__ !== false;
   const isDemoInvestor = !!(auth && auth.method === 'wallet' && auth.id === '0xDEMO');
   const realRequested = liveModeEnabled && liveMode === 'real' && !isDemoInvestor;
