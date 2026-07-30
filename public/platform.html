@@ -1376,6 +1376,23 @@ function useChainWeb3(account){
     } catch(e) { return { ok:false, reason:parseRevert(e) }; }
   }
 
+  /**
+   * Lee el allowlist on-chain del token específico (TOKAIToken.isJurisdictionAllowed,
+   * ver TOKAIToken.sol:363). Sincroniza el geofencing: el blocklist global de
+   * gobernanza TOKAI (blockedJurisdictions) es el gate preventivo, esto es la
+   * verificación adicional contra la regla real del contrato de ese proyecto.
+   * Nunca bloquea por errores de lectura (RPC caído, etc.) — el blocklist
+   * global sigue siendo la protección primaria.
+   */
+  async function isJurisdictionAllowedOnChain(tokenAddress, jur){
+    if(!tokenAddress || jur == null) return true;
+    try{
+      const abi = ['function isJurisdictionAllowed(uint16) view returns (bool)'];
+      const tok = new window.ethers.Contract(tokenAddress, abi, provider());
+      return await tok.isJurisdictionAllowed(jur);
+    }catch(e){ console.warn('isJurisdictionAllowedOnChain', e); return true; }
+  }
+
   return {
     identities, projects, balances:balancesCache, holders:{}, yieldPool:{}, orders:[], events, now:Math.floor(Date.now()/1000),
     registerIdentity:_registerIdentity, revokeIdentity, canTransfer,
@@ -1385,6 +1402,7 @@ function useChainWeb3(account){
     claimableYield, claimYield, createOrder, fillOrder, cancelOrder, createProject, advanceTime,
     // v3.3.0 — ERC-721 / multi-standard
     addQualifiedInvestor, batchMint, redeem, estimateGas,
+    isJurisdictionAllowedOnChain,
     // v3.5.0 — Estrategia A (deploy de token)
     deployToken,
     // F1 — updateProject en live: persiste en backend vía PATCH
@@ -1667,7 +1685,48 @@ function InvestorOnboardingCard({project, wallet, toast}){
 
 function InvestView({chain,wallet,projectId,toast}){
   const userJur = (chain.identities[wallet.addr]?.jur) || wallet.jur;
-  const isGeofenced = chain.blockedJurisdictions.includes(userJur);
+  const globallyBlocked = chain.blockedJurisdictions.includes(userJur);
+  // Todos los hooks de este componente se declaran acá arriba, antes de
+  // cualquier return condicional: deben llamarse siempre en el mismo orden en
+  // cada render de esta instancia, incluso cuando isGeofenced cambia (ej. al
+  // cambiar de wallet/jurisdicción sin desmontar el componente) — de lo
+  // contrario React tira "Rendered fewer hooks than expected" (error #300).
+  const [onChainDisallowed,setOnChainDisallowed] = useState(false);
+  const [pid,setPid]=useState(projectId!=null?projectId:(chain.projects[0]?chain.projects[0].id:0));
+  const [step,setStep]=useState(0); // 0 select, 1 kyc, 2 fund, 3 buy, 4 done
+  const [amount,setAmount]=useState(1);
+  const gate=useGate();
+  const p=chain.projects.find(x=>String(x.id)===String(pid))||chain.projects[0]||{symbol:'—',regime:'—',jurisdictions:[],priceUsdCents:0};
+  const rpid=p.id;
+  const id=chain.identities[wallet.addr];
+  const verified=id&&id.verified;
+  const myBal=chain.bal(rpid,wallet.addr);
+
+  // Sincronización de geofencing: además del blocklist global de gobernanza
+  // TOKAI, se consulta el allowlist on-chain del token específico
+  // (TOKAIToken.isJurisdictionAllowed). Bloquea si cualquiera de las dos capas
+  // lo hace — nunca se confía solo en el chequeo del cliente para el gate real.
+  useEffect(function(){
+    let cancelled = false;
+    if (p.token && userJur != null && chain.isJurisdictionAllowedOnChain) {
+      chain.isJurisdictionAllowedOnChain(p.token, userJur).then(function(allowed){
+        if (!cancelled) setOnChainDisallowed(allowed === false);
+      });
+    } else { setOnChainDisallowed(false); }
+    return function(){ cancelled = true; };
+  }, [p.token, userJur]);
+  const isGeofenced = globallyBlocked || onChainDisallowed;
+
+  useEffect(()=>{ if(projectId!=null) setPid(projectId); },[projectId]);
+
+  // determine current step from state, checking if projectId is explicitly passed
+  useEffect(()=>{
+    if (projectId != null) {
+      setStep(verified ? (myBal > 0 ? 4 : 2) : 1);
+    } else {
+      setStep(verified ? (myBal > 0 ? 4 : 2) : 0);
+    }
+  },[verified, pid, projectId]);
 
   if (wallet.role !== 'admin' && isGeofenced) {
     return h('div', {style:{maxWidth:640, margin:'0 auto', paddingTop:40}},
@@ -1695,27 +1754,6 @@ function InvestView({chain,wallet,projectId,toast}){
       )
     );
   }
-
-  const [pid,setPid]=useState(projectId!=null?projectId:(chain.projects[0]?chain.projects[0].id:0));
-  const [step,setStep]=useState(0); // 0 select, 1 kyc, 2 fund, 3 buy, 4 done
-  const [amount,setAmount]=useState(1);
-  const gate=useGate();
-  const p=chain.projects.find(x=>String(x.id)===String(pid))||chain.projects[0]||{symbol:'—',regime:'—',jurisdictions:[],priceUsdCents:0};
-  const rpid=p.id;
-  const id=chain.identities[wallet.addr];
-  const verified=id&&id.verified;
-  const myBal=chain.bal(rpid,wallet.addr);
-
-  useEffect(()=>{ if(projectId!=null) setPid(projectId); },[projectId]);
-
-  // determine current step from state, checking if projectId is explicitly passed
-  useEffect(()=>{
-    if (projectId != null) {
-      setStep(verified ? (myBal > 0 ? 4 : 2) : 1);
-    } else {
-      setStep(verified ? (myBal > 0 ? 4 : 2) : 0);
-    }
-  },[verified, pid, projectId]);
 
   const steps=['Proyecto','Verificación KYC','Fondeo','Suscripción'];
   function doKyc(jur,cat){
@@ -2363,7 +2401,29 @@ function AssetDetail({chain,wallet,pid,toast,go}){
     yieldSource:'—'
   }, _raw);
   const userJur = (chain.identities[wallet.addr]?.jur) || wallet.jur;
-  const isGeofenced = chain.blockedJurisdictions.includes(userJur);
+  const globallyBlocked = chain.blockedJurisdictions.includes(userJur);
+  // Sincronización de geofencing: además del blocklist global de gobernanza
+  // TOKAI, se consulta el allowlist on-chain de este token específico. Bloquea
+  // si cualquiera de las dos capas lo hace.
+  const [onChainDisallowed,setOnChainDisallowed] = useState(false);
+  useEffect(function(){
+    let cancelled = false;
+    if (p.token && userJur != null && chain.isJurisdictionAllowedOnChain) {
+      chain.isJurisdictionAllowedOnChain(p.token, userJur).then(function(allowed){
+        if (!cancelled) setOnChainDisallowed(allowed === false);
+      });
+    } else { setOnChainDisallowed(false); }
+    return function(){ cancelled = true; };
+  }, [p.token, userJur]);
+  const isGeofenced = globallyBlocked || onChainDisallowed;
+  // Hooks de más abajo movidos acá arriba: deben llamarse siempre en el mismo
+  // orden en cada render de esta instancia, incluso cuando isGeofenced cambia
+  // (ej. al cambiar de wallet/jurisdicción sin desmontar el componente) — de lo
+  // contrario React tira "Rendered fewer hooks than expected" (error #300).
+  const profiles = p.tokenProfiles || [];
+  const [lightbox,setLightbox] = useState(null);
+  const [profileKey,setProfileKey] = useState(profiles[0]?profiles[0].key:null);
+  const [tokens,setTokens] = useState(10);
 
   if (wallet.role !== 'admin' && isGeofenced) {
     return h('div', {style:{maxWidth:640, margin:'0 auto', paddingTop:40}},
@@ -2392,11 +2452,7 @@ function AssetDetail({chain,wallet,pid,toast,go}){
     );
   }
 
-  const profiles = p.tokenProfiles || [];
-  const [lightbox,setLightbox] = useState(null);
-  const [profileKey,setProfileKey] = useState(profiles[0]?profiles[0].key:null);
   const profile = profiles.find(x=>x.key===profileKey) || profiles[0] || null;
-  const [tokens,setTokens] = useState(10);
   // el simulador usa el rendimiento del PERFIL elegido (tramo del waterfall), no el global
   const effYield = profile ? profile.yieldPct : p.yieldAnnualPct;
   const effPlus = profile ? profile.plusvalia : p.plusvaliaPct;
@@ -6234,7 +6290,7 @@ function KycPsavFlow({ project, walletAddr, onComplete, onError }) {
         h('span', { style: { color: 'var(--txt-mute)' } }, kv[0]),
         h('span', { style: { fontWeight: 600, fontFamily: kv[0]==='Hash'?'var(--mono)':'inherit', fontSize: kv[0]==='Hash'?10:12 } }, kv[1]));
     }),
-    h('button', { className: 'btn btn-primary', style: { marginTop: 14 }, onClick: function() { onComplete && onComplete(kycData); } }, 'Registrar on-chain'));
+    h('button', { className: 'btn btn-primary', style: { marginTop: 14 }, onClick: function() { onComplete && onComplete(kycData); } }, 'Confirmar identidad'));
 
   return null;
 }
@@ -6320,15 +6376,41 @@ function KycGate({ project, walletAddr, chain, toast, onComplete }) {
   var modeInfo = KYC_MODES[mode];
   var already = chain && chain.identities && chain.identities[walletAddr];
   var [error, setError] = useState(null);
+  var [submitted, setSubmitted] = useState(false);
 
   async function handleComplete(kycData) {
+    var API = (typeof window !== 'undefined') && window.__API_URL__;
+    if (!API) {
+      // Modo demo (sin backend): se mantiene el registro mock instantáneo.
+      try {
+        var r = await chain.registerIdentity(walletAddr, kycData.jurisdiction, kycData.category, kycData.claimHash);
+        if (r && r.ok) {
+          toast && toast({ title: 'KYC registrado (demo)', msg: '0x..' + walletAddr.slice(-6) + ' via ' + modeInfo.label });
+          onComplete && onComplete(kycData);
+        } else { setError((r && r.reason) || 'Error al registrar (demo).'); }
+      } catch (e) { setError(e.message); }
+      return;
+    }
+    // Modo real: el KYC es 100% administrado por TOKAI. El inversor nunca puede
+    // registrar su propia identidad on-chain (IdentityRegistry.sol exige
+    // COMPLIANCE_ROLE, que solo tiene la wallet de TOKAI). Acá solo se envía la
+    // solicitud; el registro on-chain lo dispara TOKAI al aprobar en el panel
+    // (AdminAccesos → tab KYC → identityRegistryRegisterOnChain).
     try {
-      var r = await chain.registerIdentity(walletAddr, kycData.jurisdiction, kycData.category, kycData.claimHash);
-      if (r && r.ok) {
-        toast && toast({ title: 'KYC registrado on-chain', msg: '0x..' + walletAddr.slice(-6) + ' via ' + modeInfo.label });
-        onComplete && onComplete(kycData);
-      } else { setError((r && r.reason) || 'Error al registrar on-chain.'); }
-    } catch (e) { setError(e.message); }
+      var res = await fetch(API + '/kyc', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: walletAddr.toLowerCase() + '@wallet.tokai',
+          wallet_address: walletAddr,
+          jurisdiction: kycData.jurisdiction,
+          provider: kycData.provider,
+        }),
+      });
+      var data = await res.json();
+      if (!res.ok) { setError(data.error || 'No se pudo enviar la solicitud.'); return; }
+      setSubmitted(true);
+      toast && toast({ title: 'KYC enviado a TOKAI', msg: 'Tu identidad quedó en revisión. Te avisamos cuando TOKAI la verifique on-chain.' });
+    } catch (e) { setError(e.message || 'No se pudo enviar la solicitud.'); }
   }
 
   function handleError(msg) { setError(msg); toast && toast({ type: 'err', title: 'Error KYC', msg: msg }); }
@@ -6338,6 +6420,12 @@ function KycGate({ project, walletAddr, chain, toast, onComplete }) {
     h('div', {},
       h('div', { style: { fontWeight: 700, fontSize: 13, color: 'var(--emerald)' } }, 'Identidad verificada'),
       h('div', { style: { fontSize: 11, color: 'var(--txt-mute)', marginTop: 2 } }, 'Via ' + modeInfo.label + ' · 0x..' + walletAddr.slice(-6))));
+
+  if (submitted) return h('div', { style: { padding: '12px 16px', borderRadius: 10, background: 'rgba(255,178,62,.06)', border: '1px solid rgba(255,178,62,.2)', display: 'flex', gap: 10, alignItems: 'center' } },
+    h('div', { style: { fontSize: 18 } }, '⏳'),
+    h('div', {},
+      h('div', { style: { fontWeight: 700, fontSize: 13, color: '#FFB23E' } }, 'KYC en revisión por TOKAI'),
+      h('div', { style: { fontSize: 11, color: 'var(--txt-mute)', marginTop: 2 } }, 'TOKAI verifica y registra tu identidad on-chain — no hace falta que hagas nada más.')));
 
   return h('div', {},
     h('div', { style: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14 } },
@@ -7195,6 +7283,7 @@ function AdminAccesos({ chain, toast }) {
       .catch(function(){});
   }
   var [kycRows, setKycRows] = useState([]);
+  var [kycCategoryDraft, setKycCategoryDraft] = useState({}); // id -> 1|2|3, elegido por TOKAI antes de aprobar
   var [investRows, setInvestRows] = useState([]);
   function loadKyc(){
     if(!API) return;
@@ -7281,19 +7370,31 @@ function AdminAccesos({ chain, toast }) {
   function reviewKycEntry(id, action) {
     if (!API) return;
     var entry = kycRows.find(function(k){ return k.id === id; });
-    fetch(API + '/admin/kyc/' + id + '/' + action, { method: 'POST', credentials: 'include' })
+    var category = kycCategoryDraft[id] || 1;
+    var body = action === 'approve' ? { category: category } : {};
+    fetch(API + '/admin/kyc/' + id + '/' + action, { method: 'POST', credentials: 'include', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) })
       .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
       .then(function(){
         loadKyc();
-        /* Automatización por la factory: aprobación off-chain → registro on-chain inmediato */
-        if(action === 'approve' && entry && entry.wallet_address && (typeof window !== 'undefined') && window.__PREGAT__ && typeof preGATWhitelistOnChain === 'function'){
-          toast && toast({ title: 'KYC aprobado', msg: 'Registrando la wallet on-chain — firmá la transacción en MetaMask…' });
-          preGATWhitelistOnChain(entry.wallet_address)
-            .then(function(hash){ toast && toast({ title: 'KYC on-chain ✓', msg: entry.wallet_address.slice(0,10) + '… habilitado en el contrato de la factory.', hash: hash }); })
-            .catch(function(e){ toast && toast({ type: 'warn', title: 'Registro on-chain pendiente', msg: ((e && e.message) || 'No se pudo firmar.') + ' Podés completarlo desde Accesos → Whitelist on-chain o TOKAI → Instrumentos.' }); });
+        if (action !== 'approve' || !entry || !entry.wallet_address) {
+          toast && toast({ title: action === 'approve' ? 'KYC aprobado' : 'KYC rechazado', msg: 'La verificación fue actualizada.' });
           return;
         }
-        toast && toast({ title: action === 'approve' ? 'KYC aprobado' : 'KYC rechazado', msg: 'La verificación fue actualizada.' });
+        /* KYC administrado 100% por TOKAI: aprobación off-chain → registro on-chain
+           inmediato en el IdentityRegistry de la factory, firmado con la wallet de
+           TOKAI (COMPLIANCE_ROLE). Sin proveedor externo. */
+        if (typeof identityRegistryRegisterOnChain === 'function') {
+          toast && toast({ title: 'KYC aprobado', msg: 'Registrando identidad on-chain en el IdentityRegistry — firmá la transacción en MetaMask…' });
+          identityRegistryRegisterOnChain(entry.wallet_address, entry.jurisdiction || 32, category)
+            .then(function(hash){ toast && toast({ title: 'Identidad on-chain ✓', msg: entry.wallet_address.slice(0,10) + '… verificada en el IdentityRegistry de TOKAI.', hash: hash }); })
+            .catch(function(e){ toast && toast({ type: 'warn', title: 'Registro on-chain pendiente', msg: ((e && e.message) || 'No se pudo firmar.') + ' El KYC quedó aprobado en TOKAI; reintentá el registro on-chain cuando tengas la wallet de TOKAI conectada.' }); });
+        }
+        /* Automatización adicional específica del certificado soulbound PRE-GAT (etapa 1) */
+        if ((typeof window !== 'undefined') && window.__PREGAT__ && typeof preGATWhitelistOnChain === 'function') {
+          preGATWhitelistOnChain(entry.wallet_address)
+            .then(function(hash){ toast && toast({ title: 'PRE-GAT whitelist ✓', msg: entry.wallet_address.slice(0,10) + '… habilitado en el certificado soulbound.', hash: hash }); })
+            .catch(function(){ /* silencioso: es un plus, no bloquea el KYC principal */ });
+        }
       })
       .catch(function(){ toast && toast({ type: 'err', title: 'Error', msg: 'No se pudo actualizar la verificación.' }); });
   }
@@ -7370,7 +7471,7 @@ function AdminAccesos({ chain, toast }) {
       return h('div', { className: 'card', style: { padding: 0, overflowX: 'auto' } },
         h('table', { style: { width: '100%', borderCollapse: 'collapse' } },
           h('thead', {},
-            h('tr', {}, ['Email', 'Wallet', 'Proveedor', 'Jurisdicción', 'Fecha', 'Estado / Acción'].map(function(col) {
+            h('tr', {}, ['Email', 'Wallet', 'Proveedor', 'Jurisdicción', 'Categoría', 'Fecha', 'Estado / Acción'].map(function(col) {
               return h('th', { key: col, style: { padding: '10px 12px', textAlign: 'left', fontSize: 11, color: 'var(--txt-mute)', textTransform: 'uppercase', letterSpacing: '.05em', borderBottom: '1px solid var(--line-solid)', background: 'rgba(255,255,255,.02)' } }, col);
             }))),
           h('tbody', {}, kycRows.map(function(k) {
@@ -7379,6 +7480,15 @@ function AdminAccesos({ chain, toast }) {
               h('td', { style: { ...cell, fontFamily: 'var(--mono)', fontSize: 10.5 } }, k.wallet_address ? k.wallet_address.slice(0, 10) + '…' + k.wallet_address.slice(-6) : '—'),
               h('td', { style: cell }, k.provider),
               h('td', { style: cell }, k.jurisdiction ? (JUR[k.jurisdiction] || k.jurisdiction) : '—'),
+              h('td', { style: cell },
+                k.status === 'pending'
+                  ? h('select', {
+                      value: kycCategoryDraft[k.id] || 1,
+                      onChange: function(e){ var v = +e.target.value; setKycCategoryDraft(function(s){ return Object.assign({}, s, { [k.id]: v }); }); },
+                      style: { padding: '4px 6px', borderRadius: 6, border: '1px solid var(--line-solid)', background: 'var(--black)', color: 'var(--txt)', fontSize: 11 },
+                      title: 'Categoría que TOKAI confirma para el registro on-chain en el IdentityRegistry'
+                    }, Object.entries(CAT).map(function(kv){ return h('option', { key: kv[0], value: kv[0] }, kv[1]); }))
+                  : h('span', {}, k.category ? (CAT[k.category] || k.category) : '—')),
               h('td', { style: { ...cell, fontSize: 11 } }, k.created_at ? new Date(k.created_at).toLocaleDateString('es-AR') : '—'),
               h('td', { style: cell },
                 k.status === 'pending'
@@ -7705,6 +7815,37 @@ async function preGATWhitelistOnChain(addr){
   var abi = (window.__ABIS__ && window.__ABIS__.GATCertificate) || PREGAT_READ_ABI;
   var contract = new ethers.Contract(cfg.address, abi, signer);
   var tx = await contract.addQualifiedInvestor(addr);
+  await tx.wait();
+  return tx.hash;
+}
+
+/* ── Registro de identidad KYC en el IdentityRegistry de la factory TOKAI ──
+   Camino real y único para verificar inversores: TOKAI aprueba en el panel
+   ("KYC 100% administrado por TOKAI") y firma con su propia wallet, que tiene
+   COMPLIANCE_ROLE en el contrato — no hay proveedor externo. El inversor
+   nunca puede llamar esto: IdentityRegistry.sol solo acepta COMPLIANCE_ROLE
+   (ver constructor), por eso el intento de auto-registro del inversor se
+   quitó de KycGate y esta es la única vía. */
+async function identityRegistryRegisterOnChain(wallet, jurisdiction, category){
+  var dep = (typeof window !== 'undefined') && window.__DEPLOYMENT__;
+  if (!window.ethereum || !dep || !dep.identityRegistry || !window.__TOKAI_ENABLE_LIVE_MODE__) {
+    // Fallback demo: sin wallet/deployment real conectado todavía
+    return '0x' + Array.from({length:32}, () => Math.floor(Math.random()*16).toString(16)).join('') + ' (demo)';
+  }
+  if (!window.ethers) throw new Error('ethers no disponible');
+  var mm = Array.isArray(window.ethereum.providers)
+    ? (window.ethereum.providers.find(function(p){ return p.isMetaMask; }) || null)
+    : (window.ethereum.isMetaMask ? window.ethereum : null);
+  if (!mm) throw new Error('MetaMask no encontrado');
+  var currentChain = await mm.request({ method: 'eth_chainId' });
+  if (parseInt(currentChain, 16) !== dep.chainId) {
+    throw new Error('Tu wallet está en la red equivocada. Cambiá a ' + (dep.network || dep.chainId) + ' desde el botón de red en la barra superior y reintentá.');
+  }
+  var provider = new ethers.BrowserProvider(mm);
+  var signer = await provider.getSigner();
+  var abi = ['function registerIdentity(address investor, uint16 jurisdiction, uint8 category)'];
+  var contract = new ethers.Contract(dep.identityRegistry, abi, signer);
+  var tx = await contract.registerIdentity(wallet, jurisdiction, category);
   await tx.wait();
   return tx.hash;
 }
@@ -8302,6 +8443,23 @@ function PreGATInvestorCard({ walletAddr, toast }) {
 /* ════════════════════════════════════════════════════════════════════
    APP SHELL v3 — login dual · modo simple/experto · router
    ════════════════════════════════════════════════════════════════════ */
+/* ── Confirmación de seguridad antes de pasar a modo Real ──
+   Reemplaza un simple toggle de un click: a partir de acá las acciones
+   (invertir, reclamar renta, OTC, deploy) firman transacciones con fondos y
+   gas reales. Requiere confirmación explícita — ver punto 4 de la auditoría
+   de flujo (tasks.md #33/agent_sync). */
+function RealModeConfirmModal({onCancel,onConfirm}){
+  return h('div',{style:{position:'fixed',inset:0,background:'rgba(0,0,0,.72)',backdropFilter:'blur(10px)',zIndex:300,display:'flex',alignItems:'center',justifyContent:'center',padding:20}},
+    h('div',{style:{maxWidth:440,width:'100%',background:'linear-gradient(145deg,rgba(16,20,32,.97),rgba(10,14,24,.99))',border:'1px solid rgba(255,178,62,.25)',boxShadow:'0 0 0 1px rgba(255,255,255,.04),0 32px 80px rgba(0,0,0,.7)',borderRadius:20,padding:28}},
+      h('div',{style:{fontSize:28,marginBottom:10}},'⚠️'),
+      h('div',{style:{fontWeight:800,fontSize:16,marginBottom:8}},'Vas a pasar a modo Real'),
+      h('p',{style:{fontSize:13,color:'var(--txt-dim)',lineHeight:1.6,marginBottom:18}},
+        'A partir de acá, invertir, reclamar renta, operar en el mercado OTC o desplegar un token va a firmar transacciones con fondos y gas reales en la red conectada. No es una simulación y no siempre es reversible.'),
+      h('div',{style:{display:'flex',gap:10,justifyContent:'flex-end'}},
+        h('button',{className:'btn btn-ghost',onClick:onCancel},'Cancelar, seguir en Demo'),
+        h('button',{className:'btn btn-primary',style:{background:'#FFB23E',borderColor:'#FFB23E',color:'#0A0A0A'},onClick:onConfirm},'Sí, operar en modo real'))));
+}
+
 function App(){
   const [auth,setAuth] = useState(null);
   const [paid,setPaid] = useState(false); // retainer de estructuración pagado
@@ -8354,6 +8512,17 @@ function App(){
     setLiveMode(nextMode);
     try{ localStorage.setItem('tokai_live_mode', nextMode); }catch(e){}
   }
+  // Seguridad: pasar a "Real" activa transacciones con fondos y gas reales de
+  // forma inmediata (invertir, reclamar renta, OTC, deploy). Requiere
+  // confirmación explícita en vez de un solo click para evitar operar en real
+  // por accidente. Real → Demo no necesita confirmación (siempre es seguro).
+  const [showRealConfirm,setShowRealConfirm] = useState(false);
+  function requestRealMode(){
+    if(!liveModeEnabled) return;
+    if(liveMode==='real') return;
+    setShowRealConfirm(true);
+  }
+  function confirmRealMode(){ setShowRealConfirm(false); setMode('real'); }
 
   function go(v,pid,sub){
     let path = v;
@@ -8601,7 +8770,7 @@ function App(){
         h('div',{className:'topbar-right'},
           liveModeEnabled&&!isDemoInvestor&&h('div',{className:'role-switch'},
             h('button',{className:'role-btn'+(!isReal?' active':''),onClick:()=>setMode('demo')},'Demo'),
-            h('button',{className:'role-btn'+(isReal?' active':''),onClick:()=>setMode('real')},'Real')),
+            h('button',{className:'role-btn'+(isReal?' active':''),onClick:requestRealMode},'Real')),
           (canAccessRole('issuer') || canAccessRole('tokai')) && h('div',{className:'role-switch'},
             h('button',{className:'role-btn'+(role==='investor'?' active':''),onClick:()=>{ if(activateRole('investor')) go('dash'); }},'Inversor'),
             canAccessRole('issuer')&&h('button',{className:'role-btn'+(role==='issuer'?' active':''),onClick:()=>{ if(activateRole('issuer')) go('home'); }},'Emisor'),
@@ -8635,7 +8804,8 @@ function App(){
         view==='emission-checklist'&&canAccessRole('tokai')&&h(EmissionChecklist,{chain,toast}),
         view==='report-gen'&&canAccessRole('tokai')&&h(ReportExporter,{chain,toast})
       ),
-      role==='issuer'&&h(IssuerAssistantFloat,{chain})
+      role==='issuer'&&h(IssuerAssistantFloat,{chain}),
+      showRealConfirm&&h(RealModeConfirmModal,{onCancel:()=>setShowRealConfirm(false),onConfirm:confirmRealMode})
     )
   );
 }
