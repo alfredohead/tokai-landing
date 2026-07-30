@@ -105,6 +105,11 @@
     return !!(dep() && dep().tokenFactory && window.ethereum);
   }
 
+  /**
+   * @param {any} tx
+   * @param {any} receipt
+   * @returns {DeployEvidence}
+   */
   function deployEvidence(tx, receipt) {
     const deployment = dep() || {};
     return {
@@ -220,6 +225,12 @@
     };
   }
 
+  /**
+   * Despliega un token ERC-4626 (vault de renta) vía TokenFactory.
+   * @param {{ name:string, symbol:string, adminAddress?:string }} project
+   * @param {any} signer
+   * @returns {Promise<DeployResult | TxFail>}
+   */
   async function deployERC4626(project, signer) {
     if (!isLive()) return { ok: false, reason: 'Sistema en modo demo' };
 
@@ -238,9 +249,15 @@
         }
       } catch { /* */ }
     }
-    return { ok: true, hash: tx.hash, tokenAddr, registryAddr, deployEvidence: deployEvidence(tx, receipt) };
+    return { ok: true, hash: tx.hash, tokenAddr, registryAddr, blockNumber: receipt.blockNumber, deployEvidence: deployEvidence(tx, receipt) };
   }
 
+  /**
+   * Despliega un token ERC-7540 (vault asíncrono) vía TokenFactory.
+   * @param {{ name:string, symbol:string, adminAddress?:string }} project
+   * @param {any} signer
+   * @returns {Promise<DeployResult | TxFail>}
+   */
   async function deployERC7540(project, signer) {
     if (!isLive()) return { ok: false, reason: 'Sistema en modo demo' };
 
@@ -259,9 +276,15 @@
         }
       } catch { /* */ }
     }
-    return { ok: true, hash: tx.hash, tokenAddr, registryAddr, deployEvidence: deployEvidence(tx, receipt) };
+    return { ok: true, hash: tx.hash, tokenAddr, registryAddr, blockNumber: receipt.blockNumber, deployEvidence: deployEvidence(tx, receipt) };
   }
 
+  /**
+   * Despliega un token ERC-5192 (soulbound, ej. certificado preGAT) vía TokenFactory.
+   * @param {{ name:string, symbol:string, maxSupply?:number, baseURI?:string, adminAddress?:string }} project
+   * @param {any} signer
+   * @returns {Promise<DeployResult | TxFail>}
+   */
   async function deployERC5192(project, signer) {
     if (!isLive()) return { ok: false, reason: 'Sistema en modo demo' };
 
@@ -284,9 +307,15 @@
         if (parsed?.name === 'ProjectDeployed') { tokenAddr = parsed.args[2]; break; }
       } catch { /* */ }
     }
-    return { ok: true, hash: tx.hash, tokenAddr, deployEvidence: deployEvidence(tx, receipt) };
+    return { ok: true, hash: tx.hash, tokenAddr, blockNumber: receipt.blockNumber, deployEvidence: deployEvidence(tx, receipt) };
   }
 
+  /**
+   * Despliega un token ERC-1155 (multi-token) vía TokenFactory.
+   * @param {{ name:string, symbol:string, baseURI?:string, adminAddress?:string }} project
+   * @param {any} signer
+   * @returns {Promise<DeployResult | TxFail>}
+   */
   async function deployERC1155(project, signer) {
     if (!isLive()) return { ok: false, reason: 'Sistema en modo demo' };
 
@@ -308,7 +337,7 @@
         if (parsed?.name === 'ProjectDeployed') { tokenAddr = parsed.args[2]; break; }
       } catch { /* */ }
     }
-    return { ok: true, hash: tx.hash, tokenAddr, deployEvidence: deployEvidence(tx, receipt) };
+    return { ok: true, hash: tx.hash, tokenAddr, blockNumber: receipt.blockNumber, deployEvidence: deployEvidence(tx, receipt) };
   }
 
   /**
