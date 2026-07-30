@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * TOKAI RWA — Web3 Integration Layer v1.0
  *
@@ -18,6 +19,66 @@
 
 (function () {
   'use strict';
+
+  // ─── Tipos compartidos (JSDoc / @ts-check — Fase 5) ─────────────────────────
+
+  /**
+   * @typedef {{ ok: true, hash: string, blockNumber?: number }} TxOk
+   * @typedef {{ ok: false, reason: string }} TxFail
+   * @typedef {TxOk | TxFail} TxResult
+   */
+
+  /**
+   * @typedef {object} DeployResult
+   * @property {true}         ok
+   * @property {string}       hash
+   * @property {string|null}  tokenAddr
+   * @property {string|null}  [registryAddr]
+   * @property {number|null}  [projectId]
+   * @property {number}       blockNumber
+   * @property {DeployEvidence} deployEvidence
+   */
+
+  /**
+   * @typedef {object} DeployEvidence
+   * @property {string}       tokenDeployTxHash
+   * @property {string|undefined} tokenFactoryAddress
+   * @property {'ProjectDeployed'} tokenDeployEvent
+   * @property {string|null}  tokenDeployNetwork
+   * @property {number|null}  tokenDeployChainId
+   * @property {number}       tokenDeployBlockNumber
+   */
+
+  /**
+   * @typedef {object} ProjectRecord
+   * @property {string} token
+   * @property {string} registry
+   * @property {string} admin
+   * @property {string} standard
+   * @property {string} symbol
+   * @property {number} deployedAt
+   */
+
+  /**
+   * @typedef {object} OrderRecord
+   * @property {string} seller
+   * @property {string} token
+   * @property {bigint} amount
+   * @property {bigint} priceUsdc
+   * @property {number} createdAt
+   * @property {number} status 0=Active 1=Filled 2=Cancelled
+   */
+
+  /**
+   * @typedef {object} InfraDeployResult
+   * @property {true}   ok
+   * @property {{ tokenFactory:string, erc3643:string, erc4626:string, erc7540:string, erc1155:string, erc5192:string }} addresses
+   * @property {Record<string,string>} txHashes
+   * @property {Record<string,number>} blockNumbers
+   * @property {string} deployTxHash
+   * @property {number} deployBlockNumber
+   * @property {string} deployedBy
+   */
 
   // ─── Helpers internos ────────────────────────────────────────────────────────
 
@@ -59,9 +120,16 @@
   // ─── 1. KYC — IdentityRegistry ───────────────────────────────────────────────
 
   /**
-   * Registra o actualiza identidad de un inversor.
-   * Contrato real: registerIdentity(investor, jurisdiction_, category_) — 3 args
-   * Bug frontend:  registerIdentity(addr, jur, cat, kycHash)            — 4 args (INCORRECTO)
+   * Registra o actualiza identidad de un inversor en el IdentityRegistry on-chain.
+   *
+   * FIRMA CORRECTA (3 args): registerIdentity(investor, jurisdiction_, category_)
+   * El bug anterior del frontend enviaba 4 args (+ kycHash) — INCORRECTO y ya corregido.
+   *
+   * @param {string} investorAddr   - Dirección Ethereum del inversor (0x…)
+   * @param {number} jurisdiction   - Código ISO 3166-1 numérico (ej. 32 = Argentina, 840 = USA)
+   * @param {number} category       - Categoría KYC aprobada por TOKAI (0 = retail, 1 = PSAV, etc.)
+   * @param {any}    signer         - ethers.Signer con COMPLIANCE_ROLE en el IdentityRegistry
+   * @returns {Promise<TxResult>}
    */
   async function registerIdentity(investorAddr, jurisdiction, category, signer) {
     if (!isLive()) return { ok: false, reason: 'Sistema en modo demo' };
@@ -72,6 +140,12 @@
     return { ok: true, hash: tx.hash, blockNumber: receipt.blockNumber };
   }
 
+  /**
+   * Revoca la identidad registrada de un inversor en el IdentityRegistry.
+   * @param {string} investorAddr - Dirección del inversor a revocar
+   * @param {any}    signer       - ethers.Signer con COMPLIANCE_ROLE
+   * @returns {Promise<TxResult>}
+   */
   async function revokeIdentity(investorAddr, signer) {
     if (!isLive()) return { ok: false, reason: 'Sistema en modo demo' };
 
@@ -81,6 +155,13 @@
     return { ok: true, hash: tx.hash };
   }
 
+  /**
+   * Consulta si un inversor está verificado en el IdentityRegistry.
+   * @param {string}      investorAddr       - Dirección del inversor
+   * @param {string|null} [tokenRegistryAddr] - Dirección del registry específico del proyecto;
+   *                                           si se omite usa el global de dep().identityRegistry
+   * @returns {Promise<boolean>}
+   */
   async function isVerified(investorAddr, tokenRegistryAddr) {
     if (!isLive()) return false;
 
@@ -96,8 +177,9 @@
    * Contrato real: deployERC3643(name_, symbol_, maxSupply_, priceUsdCents_, admin_) — 5 args
    * Bug frontend:  deployToken(name, symbol, maxSupply)                               — 3 args (INCORRECTO)
    *
-   * @param {object} project - { name, symbol, maxSupply, priceUsdCents, adminAddress }
-   * @param {ethers.Signer} signer
+   * @param {{ name:string, symbol:string, maxSupply?:number, priceUsdCents?:number, adminAddress?:string }} project
+   * @param {any} signer
+   * @returns {Promise<DeployResult | TxFail>}
    */
   async function deployERC3643(project, signer) {
     if (!isLive()) return { ok: false, reason: 'Sistema en modo demo' };
@@ -229,7 +311,15 @@
     return { ok: true, hash: tx.hash, tokenAddr, deployEvidence: deployEvidence(tx, receipt) };
   }
 
-  /** Router unificado — el frontend llama deployToken(project, signer) y este módulo elige */
+  /**
+   * Router unificado de deploy de tokens. El frontend llama siempre a esta función;
+   * el módulo elige la sub-factory correcta según `project.standard`.
+   *
+   * @param {{ name:string, symbol:string, maxSupply?:number, priceUsdCents?:number,
+   *           adminAddress?:string, standard?:string, baseURI?:string }} project
+   * @param {any} signer - ethers.Signer con fondos en la red destino
+   * @returns {Promise<DeployResult | TxFail>}
+   */
   async function deployToken(project, signer) {
     const std = (project.standard || 'ERC-3643').toUpperCase().replace('-', '');
     if (std.includes('3643')) return deployERC3643(project, signer);
@@ -368,9 +458,16 @@
   // ─── 3. Emisión — TOKAIToken ──────────────────────────────────────────────────
 
   /**
-   * Mint de tokens.
-   * Contrato real: mint(to, amount)         — 2 args
-   * Bug frontend:  mint(to, amount, serieId) — 3 args (INCORRECTO)
+   * Mint de tokens ERC-3643 / TOKAIToken.
+   *
+   * FIRMA CORRECTA (2 args): mint(to, amount)
+   * El bug anterior del frontend enviaba 3 args (+ serieId) — INCORRECTO y ya corregido.
+   *
+   * @param {string}        tokenAddr - Dirección del contrato TOKAIToken
+   * @param {string}        toAddr    - Dirección del receptor
+   * @param {number|string} amount    - Cantidad en unidades (no en wei; se convierte internamente)
+   * @param {any}           signer    - ethers.Signer con MINTER_ROLE en el token
+   * @returns {Promise<TxResult>}
    */
   async function mint(tokenAddr, toAddr, amount, signer) {
     if (!isLive()) return { ok: false, reason: 'Sistema en modo demo' };
@@ -382,9 +479,15 @@
   }
 
   /**
-   * Habilitar / deshabilitar emisión.
-   * Contrato real: enableEmission(bool)      — 1 arg bool
-   * Bug frontend:  enableEmission(serieId)   — arg incorrecto
+   * Habilitar o deshabilitar la emisión primaria del token.
+   *
+   * FIRMA CORRECTA (1 arg bool): enableEmission(bool)
+   * El bug anterior del frontend pasaba un serieId en vez de un booleano — INCORRECTO.
+   *
+   * @param {string}  tokenAddr - Dirección del contrato TOKAIToken
+   * @param {boolean} enabled   - true = habilitar emisión, false = deshabilitar
+   * @param {any}     signer    - ethers.Signer con DEFAULT_ADMIN_ROLE
+   * @returns {Promise<TxResult>}
    */
   async function setEmission(tokenAddr, enabled, signer) {
     if (!isLive()) return { ok: false, reason: 'Sistema en modo demo' };
@@ -397,6 +500,13 @@
 
   // ─── 4. Yield — TOKAIToken / YieldDistributor ─────────────────────────────────
 
+  /**
+   * Consulta el yield reclamable pendiente para un inversor (view — sin gas).
+   * @param {string} tokenAddr    - Dirección del contrato TOKAIToken
+   * @param {string} investorAddr - Dirección del inversor
+   * @param {any}    provider     - ethers.Provider (no se necesita signer)
+   * @returns {Promise<bigint>}   Yield pendiente en USDC (6 decimales). Retorna 0n en modo demo.
+   */
   async function claimableYield(tokenAddr, investorAddr, provider) {
     if (!isLive()) return 0n;
 
@@ -404,6 +514,12 @@
     return token.claimableYield(investorAddr);
   }
 
+  /**
+   * Reclama el yield pendiente del inversor en el contrato TOKAIToken.
+   * @param {string} tokenAddr - Dirección del contrato TOKAIToken
+   * @param {any}    signer    - ethers.Signer del inversor (paga gas en POL)
+   * @returns {Promise<{ok:true, hash:string, amount:bigint, amountFormatted:string, gasPOL:string} | TxFail>}
+   */
   async function claimYield(tokenAddr, signer) {
     if (!isLive()) return { ok: false, reason: 'Sistema en modo demo' };
 
@@ -439,13 +555,14 @@
   // El frontend tenía stubs vacíos. Aquí está la integración real.
 
   /**
-   * Crea una orden de venta OTC.
-   * El vendedor debe haber aprobado el OTCMarket para `amount` tokens antes.
+   * Crea una orden de venta OTC. Internamente aprueba el OTCMarket para tomar tokens
+   * en escrow y luego llama a otc.createOrder(token, amount, priceUsdc).
    *
-   * @param {string}        tokenAddr  - Dirección del token a vender
-   * @param {bigint|string} amount     - Cantidad de tokens (en wei / 18 decimales)
-   * @param {bigint|string} priceUsdc  - Precio total en USDC (6 decimales)
-   * @param {ethers.Signer} signer
+   * @param {string}        tokenAddr - Dirección del token a vender
+   * @param {bigint|string} amount    - Cantidad de tokens (en wei, 18 decimales)
+   * @param {bigint|string} priceUsdc - Precio total pedido en USDC (6 decimales)
+   * @param {any}           signer    - ethers.Signer del vendedor
+   * @returns {Promise<{ok:true, hash:string, orderId:bigint|null} | TxFail>}
    */
   async function createOrder(tokenAddr, amount, priceUsdc, signer) {
     if (!isLive()) return { ok: false, reason: 'Sistema en modo demo' };
@@ -474,12 +591,13 @@
   }
 
   /**
-   * Compra los tokens de una orden OTC.
-   * El comprador debe haber aprobado el OTCMarket para `priceUsdc` USDC antes.
+   * Compra los tokens de una orden OTC activa. Aprueba el USDC al OTCMarket
+   * e invoca otc.fillOrder(orderId).
    *
-   * @param {string}        orderId  - bytes32 del ID de la orden
-   * @param {bigint|string} priceUsdc - Precio total de la orden (para el approve)
-   * @param {ethers.Signer} signer
+   * @param {string}        orderId   - bytes32 ID de la orden (de OrderCreated event)
+   * @param {bigint|string} priceUsdc - Precio total en USDC para el approve previo
+   * @param {any}           signer    - ethers.Signer del comprador
+   * @returns {Promise<{ok:true, hash:string, blockNumber:number} | TxFail>}
    */
   async function fillOrder(orderId, priceUsdc, signer) {
     if (!isLive()) return { ok: false, reason: 'Sistema en modo demo' };
@@ -502,7 +620,10 @@
   }
 
   /**
-   * El vendedor cancela su orden y recupera los tokens del escrow.
+   * El vendedor cancela su orden activa y recupera los tokens del escrow.
+   * @param {string} orderId - bytes32 ID de la orden
+   * @param {any}    signer  - ethers.Signer del vendedor original
+   * @returns {Promise<TxResult>}
    */
   async function cancelOrder(orderId, signer) {
     if (!isLive()) return { ok: false, reason: 'Sistema en modo demo' };
@@ -514,7 +635,10 @@
   }
 
   /**
-   * Lee una orden del OTCMarket (view — sin signer).
+   * Lee los datos de una orden OTC del contrato (view — sin gas).
+   * @param {string} orderId  - bytes32 ID de la orden
+   * @param {any}    provider - ethers.Provider
+   * @returns {Promise<OrderRecord|null>}  null en modo demo
    */
   async function getOrder(orderId, provider) {
     if (!isLive()) return null;
@@ -532,7 +656,11 @@
   }
 
   /**
-   * Lista las órdenes activas con paginación.
+   * Lista las órdenes activas en el OTCMarket con paginación.
+   * @param {number} offset   - Índice de inicio (0-based)
+   * @param {number} limit    - Cantidad máxima de órdenes a retornar
+   * @param {any}    provider - ethers.Provider
+   * @returns {Promise<{ids:bigint[], orders:OrderRecord[], total:bigint}>}
    */
   async function getActiveOrders(offset, limit, provider) {
     if (!isLive()) return { ids: [], orders: [], total: 0n };
@@ -554,7 +682,12 @@
   }
 
   /**
-   * Órdenes de un vendedor específico.
+   * Lista las órdenes de un vendedor específico con paginación.
+   * @param {string} sellerAddr - Dirección del vendedor
+   * @param {number} offset     - Índice de inicio (0-based)
+   * @param {number} limit      - Cantidad máxima de órdenes
+   * @param {any}    provider   - ethers.Provider
+   * @returns {Promise<{ids:bigint[], orders:OrderRecord[], total:bigint}>}
    */
   async function getOrdersBySeller(sellerAddr, offset, limit, provider) {
     if (!isLive()) return { ids: [], orders: [], total: 0n };
@@ -580,7 +713,9 @@
   // ─── 6. Proyectos — TokenFactory (lectura) ────────────────────────────────────
 
   /**
-   * Lee la cantidad de proyectos desplegados.
+   * Lee la cantidad total de proyectos desplegados en la TokenFactory.
+   * @param {any} provider - ethers.Provider
+   * @returns {Promise<bigint>} Cantidad de proyectos. Retorna 0n en modo demo.
    */
   async function projectCount(provider) {
     if (!isLive()) return 0n;
@@ -589,9 +724,14 @@
   }
 
   /**
-   * Lee un proyecto por ID.
+   * Lee un proyecto por ID desde la TokenFactory.
    * Contrato real: getProject(id) → (token, registry, admin, standard, symbol, deployedAt)
-   * Bug frontend:  projects(index) → (name, token, compliance)  [INCORRECTO]
+   *
+   * @deprecated useChainWeb3 aún llama factory.projects(index) que usa el ABI legacy;
+   *             corregir en el Eje D (descomposición del monólito) — ver ADR-016.
+   * @param {number|bigint} projectId - ID del proyecto (0-based)
+   * @param {any}           provider  - ethers.Provider
+   * @returns {Promise<ProjectRecord|null>} null en modo demo
    */
   async function getProject(projectId, provider) {
     if (!isLive()) return null;
@@ -607,6 +747,13 @@
     };
   }
 
+  /**
+   * Obtiene un rango paginado de proyectos de la TokenFactory.
+   * @param {number} offset   - Índice de inicio (0-based)
+   * @param {number} limit    - Cantidad máxima de registros
+   * @param {any}    provider - ethers.Provider
+   * @returns {Promise<ProjectRecord[]>} Array vacío en modo demo.
+   */
   async function getProjects(offset, limit, provider) {
     if (!isLive()) return [];
     const factory = contract(dep().tokenFactory, 'TokenFactory', provider);
@@ -657,9 +804,12 @@
   // ─── 8. Carga asíncrona desde el backend (opcional) ──────────────────────────
 
   /**
-   * Si NO hay contracts.js cargado (no hay window.__DEPLOYMENT__),
-   * intenta cargar la configuración desde el backend.
-   * El frontend puede llamar TOKAI_WEB3.init() al arrancar.
+   * Inicializa el módulo. Si `window.__DEPLOYMENT__` ya está disponible (cargado por
+   * contracts.js), parchea los ABIs legacy. Si no, intenta cargarlo desde el backend.
+   * El frontend puede llamar `TOKAI_WEB3.init()` al arrancar para asegurarse de que
+   * los contratos estén listos antes de la primera operación.
+   * @returns {Promise<boolean>} true si la inicialización fue exitosa, false si el
+   *                             módulo quedó en modo demo (sin contratos configurados).
    */
   async function init() {
     if (window.__DEPLOYMENT__) {
