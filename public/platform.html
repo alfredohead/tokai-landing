@@ -2376,9 +2376,10 @@ function MarketView({chain,wallet,toast,initialPid}){
    AdminPitch — el emisor carga su contenido persuasivo
    Aparece en tab "Pitch ✦" del AdminView
    ════════════════════════════════════════════════════════════════════ */
-function AdminPitch({chain, toast}){
+function AdminPitch({chain, toast, initialPid}){
   const projects = chain.projects||[];
-  const [pid,setPid] = useState(0);
+  const defaultIdx = (initialPid != null) ? projects.findIndex(x => x.id === initialPid || String(x.id) === String(initialPid)) : 0;
+  const [pid,setPid] = useState(defaultIdx >= 0 ? defaultIdx : 0);
   const p = projects[pid]||projects[0]||{};
 
   // Estado del pitch (se guarda en el proyecto vía updateProject)
@@ -2407,7 +2408,8 @@ function AdminPitch({chain, toast}){
   }
 
   function save(){
-    if(chain.updateProject) chain.updateProject(pid,{pitch:{...f}});
+    const targetId = p.id != null ? p.id : pid;
+    if(chain.updateProject) chain.updateProject(targetId,{pitch:{...f}});
     toast&&toast({title:'Pitch guardado',msg:'Los inversores verán este contenido en la ficha del proyecto.'});
   }
 
@@ -9001,7 +9003,7 @@ function App(){
       if (['admin', 'tokai'].includes(v)) {
         const p1 = parts[1];
         const p2 = parts[2];
-        const knownSubs = ['dashboard','psav','kyc','checklist','geofencing','accesos','captable','contracts','infra','instrumentos','thesis-editor','report-gen','emission-engine','projects'];
+        const knownSubs = ['dashboard','psav','kyc','checklist','geofencing','accesos','captable','contracts','infra','instrumentos','thesis-editor','report-gen','emission-engine','projects','pitch','emission','mint','yield'];
         if (p1 && knownSubs.includes(p1)) {
           sub = p1;
           if (p2 != null && p2 !== '') pid = (/^\d+$/.test(p2) ? Number(p2) : p2);
