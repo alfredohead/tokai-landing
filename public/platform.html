@@ -1938,7 +1938,7 @@ function AdminView({chain,wallet,toast,subView}){
     h('h1',{className:'page'},'Administración'),
     h('p',{className:'page-sub'},'Gestión de proyectos, emisión primaria, distribución de yield, identidades y contenido de pitch para inversores.'),
     !subView && h('div',{className:'role-switch',style:{marginBottom:22,width:'fit-content'}},
-      [['projects','Proyectos'],['pitch','Pitch del emisor'],['emission','Estado emisión'],['mint','Emisión'],['yield','Yield'],['kyc','Identidades']].map(([k,l])=>
+      [['projects','Proyectos'],['pitch','Pitch y Documentos 📄'],['emission','Estado emisión'],['mint','Emisión'],['yield','Yield'],['kyc','Identidades']].map(([k,l])=>
         h('button',{key:k,className:'role-btn '+(tab===k?'active':''),onClick:()=>setTabState(k)},l))),
     tab==='projects'&&h(AdminProjects,{chain,toast}),
     tab==='pitch'&&h(AdminPitch,{chain,toast}),
@@ -4384,10 +4384,11 @@ function HomeEmisor({chain, auth, go, wallet, connectWallet}){
     h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:mine.length>1?16:0}},
       [
         {k:'admin', label:'Mis proyectos', desc:'Emisión, yield, identidades', icon:'M3 7h18M3 12h18M3 17h18', color:'#4DA8FF'},
+        {k:'admin', sub:'pitch', label:'Pitch y Documentos', desc:'Cargar flyer, PDF, fotos y video', icon:'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5', color:'#10B981'},
         {k:'thesis-client', label:'Tesis de valor', desc:'Revisar y confirmar', icon:'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5', color:'#A78BFA'},
         mine.length===0 && {k:'wizard', label:'Crear proyecto', desc:'Tokenizá tu activo', icon:'M12 5v14M5 12h14', color:'var(--emerald)'},
         {k:'guide', label:'Cómo funciona', desc:'Guía del proceso', icon:'M12 17v.01M12 13a2 2 0 10-2-2', color:'#9AA0A6'},
-      ].filter(Boolean).map(a=>h('button',{key:a.k,onClick:()=>go(a.k),
+      ].filter(Boolean).map(a=>h('button',{key:a.k+(a.sub||''),onClick:()=>a.sub?go(a.k,null,a.sub):go(a.k),
         style:{textAlign:'left',padding:'14px 16px',borderRadius:12,cursor:'pointer',
           border:'1px solid var(--line-solid)',background:'var(--panel)',
           display:'flex',gap:12,alignItems:'center',transition:'all .15s'},
@@ -5375,22 +5376,63 @@ function ThesisClientView({chain, toast}){
 
 
 /* ────────────────────────────────────────────────────────────────
+   Motor de respuestas demo/fallback para IA (usado cuando no hay backend o auth)
+   ─────────────────────────────────────────────────────────────── */
+function getDemoAiResponse(mode, userQuery) {
+  const q = (userQuery || '').toLowerCase();
+  if (mode === 'issuer') {
+    if (q.includes('foto') || q.includes('imagen') || q.includes('flyer') || q.includes('document') || q.includes('adjunt') || q.includes('cargar') || q.includes('subir')) {
+      return '**Para cargar imágenes, flyer y documentación en tu proyecto:**\n\n1. **Flyer, PDFs y Documentación de Inversores:** Dirigite a **Mis Proyectos** → opción **Pitch y Documentos** (o pestaña **Pitch y Documentos** en el panel de administración). Allí tenés la sección **⑤ Documentos para inversores** con los botones **"📎 Subir documento"** (PDF o imagen/flyer) y **"🔗 Agregar URL"**.\n2. **Fotos de Portada y Galería del Activo:** Podés cargarlas al crear el proyecto en el **Paso 3 del Wizard ("Fotos del activo")** o desde **Administración → Proyectos → Editar**.\n\n¿Querés que te guíe en algún otro paso del armado de tu proyecto?';
+    }
+    if (q.includes('proceso') || q.includes('etapa') || q.includes('ronda')) {
+      return 'El proceso de tokenización consta de **7 etapas**:\n1. **Alta:** Creás el proyecto en el wizard.\n2. **Análisis TOKAI:** Evaluación en 6 rondas institucionales.\n3. **Tesis de valor:** TOKAI define el modelo y derechos del token.\n4. **Reporte:** Modelo de negocio y proyecciones.\n5. **Técnico:** Configuración del smart contract ERC-3643.\n6. **Habilitación:** Llave de gobernanza de emisión.\n7. **Distribución:** Emisión activa y pago de dividendos.';
+    }
+    if (q.includes('costo') || q.includes('precio') || q.includes('fee')) {
+      return 'TOKAI opera bajo un esquema de estructuración transparente. Los fees de estructuración y emisión se determinan tras la evaluación del proyecto en la Ronda 1.\n\n¿Qué tipo de activo estás buscando tokenizar?';
+    }
+    return '**Hola.** Soy el asistente de TOKAI para emisores.\n\nPuedo orientarte sobre las 7 etapas del proceso, cómo subir el flyer o documentación de tu proyecto, revisar la tesis de valor o configurar tu wallet MetaMask para emitir.\n\n**¿En qué te puedo ayudar?**';
+  } else {
+    if (q.includes('derecho') || q.includes('token') || q.includes('otorg')) {
+      return 'El token otorga **derechos económicos y financieros** programados en el contrato (ej. cobro de rentas o participación en el pool), no titularidad registral sobre el bien físico. Podés revisar el detalle exacto en la Tesis de Valor del proyecto.';
+    }
+    if (q.includes('cobro') || q.includes('rendimiento') || q.includes('yield')) {
+      return 'El rendimiento se distribuye directamente on-chain en stablecoins (USDC/USDT) o moneda acordada. Podés reclamar tu renta acumulada desde tu portal de inversor en el botón **"Cobrar"**.';
+    }
+    return '**Hola.** Soy el asistente de inversión de TOKAI RWA.\n\nPuedo explicarte los derechos que otorga el token, los plazos de lock-up, la distribución de rentas y las garantías de compliance. ¿En qué te puedo ayudar?';
+  }
+}
+
+/* ────────────────────────────────────────────────────────────────
    Motor compartido de chat (usado por ambos asistentes)
    ─────────────────────────────────────────────────────────────── */
 async function sendToAI(mode, history, context) {
-  const res = await fetch((window.__API_URL__||'')+'/ai/chat', {
-    method: 'POST',
-    credentials: 'include',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      mode: mode,
-      messages: history.map(function(m){ return {role:m.role, content:String(m.content).slice(0,3000)}; }),
-      context: (context||'').slice(0,1000)
-    })
-  });
-  if(!res.ok) return 'Error al conectar con el asistente.';
-  const data = await res.json();
-  return data.text || 'Sin respuesta.';
+  const lastUserMsg = [...history].reverse().find(m => m.role === 'user')?.content || '';
+  const apiUrl = window.__API_URL__;
+  if (!apiUrl) {
+    return getDemoAiResponse(mode, lastUserMsg);
+  }
+  try {
+    const res = await fetch(apiUrl + '/ai/chat', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(localStorage.getItem('tokai_jwt') ? { 'Authorization': 'Bearer ' + localStorage.getItem('tokai_jwt') } : {})
+      },
+      body: JSON.stringify({
+        mode: mode,
+        messages: history.map(function(m){ return {role:m.role, content:String(m.content).slice(0,3000)}; }),
+        context: (context||'').slice(0,1000)
+      })
+    });
+    if (!res.ok) {
+      return getDemoAiResponse(mode, lastUserMsg);
+    }
+    const data = await res.json();
+    return data.text || getDemoAiResponse(mode, lastUserMsg);
+  } catch (err) {
+    return getDemoAiResponse(mode, lastUserMsg);
+  }
 }
 
 /* ────────────────────────────────────────────────────────────────
