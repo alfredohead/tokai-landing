@@ -3560,7 +3560,7 @@ function CapTableView({toast, chain}){
         }))));
 }
 
-function TokaiView({chain,toast,subView,go}){
+function TokaiView({chain,toast,subView,go,activeProject}){
   const totalRaised = chain.projects.reduce((s,p)=>s+p.raised,0);
   const totalKyc = Object.values(chain.identities).filter(i=>i.verified).length;
   const revoked = Object.values(chain.identities).filter(i=>i&&!i.verified).length;
@@ -3752,7 +3752,7 @@ function TokaiView({chain,toast,subView,go}){
     tab==='contracts' && h(AdminContractsConfig, {toast}),
     tab==='infra'     && h(AdminInfraConfig, {toast, chain}),
     tab==='geofencing' && h(AdminGeofencing, {toast}),
-    tab==='thesis-editor' && h(ThesisFlexEditor, {chain,toast,go}),
+    tab==='thesis-editor' && h(ThesisFlexEditor, {chain,toast,go,initialPid:activeProject}),
     tab==='report-gen' && h(ReportExporter, {chain,toast}),
     tab==='emission-engine' && h(EmissionPreview, {chain,toast}),
 
@@ -4974,9 +4974,14 @@ async function callTokaiAgent(userMsg, projectContext){
 /* ═══════════════════════════════════════════════════════════════════
    ThesisFlexEditor — formulario flexible con IA
    ═══════════════════════════════════════════════════════════════════ */
-function ThesisFlexEditor({chain, toast, go}){
+function ThesisFlexEditor({chain, toast, go, initialPid}){
   const projects = chain.projects||[];
-  const [pid,setPid] = useState(0);
+  let defaultIdx = 0;
+  if (initialPid != null) {
+    const foundIdx = projects.findIndex(x => String(x.id) === String(initialPid));
+    if (foundIdx !== -1) defaultIdx = foundIdx;
+  }
+  const [pid,setPid] = useState(defaultIdx);
   const p = projects[pid]||projects[0]||{};
 
   /* estado de los bloques */
@@ -4999,14 +5004,24 @@ function ThesisFlexEditor({chain, toast, go}){
   const [showAddBlock,setShowAddBlock] = useState(false);
   const [showExport,setShowExport] = useState(false);
 
-  /* sincronizar proyecto */
-  function syncProject(pid){
-    const pr = projects[pid]||{};
+  /* sincronizar proyecto cuando cambia initialPid o al seleccionar */
+  function syncProject(targetPid){
+    const pr = projects[targetPid]||{};
     setBlocks(pr.thesis?.blocks||buildDefaultBlocks(pr));
     setThesisState(pr.thesis?.estado||'borrador');
     setChatHistory([]);
     setAiSuggestion(null);
   }
+
+  useEffect(function(){
+    if (initialPid != null) {
+      const foundIdx = projects.findIndex(x => String(x.id) === String(initialPid));
+      if (foundIdx !== -1 && foundIdx !== pid) {
+        setPid(foundIdx);
+        syncProject(foundIdx);
+      }
+    }
+  }, [initialPid]);
 
   function save(newBlocks, newState){
     const b = newBlocks||blocks;
@@ -8830,8 +8845,13 @@ function App(){
 
   function go(v,pid,sub){
     let path = v;
-    if(pid!=null) path += `/${pid}`;
-    if(sub!=null) path += `/${sub}`;
+    if (['admin','tokai'].includes(v)) {
+      if (sub != null) path += `/${sub}`;
+      if (pid != null) path += `/${pid}`;
+    } else {
+      if (pid != null) path += `/${pid}`;
+      if (sub != null) path += `/${sub}`;
+    }
     window.location.hash = `/${path}`;
     setSidebarOpen(false);
   }
@@ -8900,7 +8920,17 @@ function App(){
       let sub = null;
 
       if (['admin', 'tokai'].includes(v)) {
-        sub = parts[1] || (v === 'admin' ? 'projects' : 'dashboard');
+        const p1 = parts[1];
+        const p2 = parts[2];
+        const knownSubs = ['dashboard','psav','kyc','checklist','geofencing','accesos','captable','contracts','infra','instrumentos','thesis-editor','report-gen','emission-engine','projects'];
+        if (p1 && knownSubs.includes(p1)) {
+          sub = p1;
+          if (p2 != null && p2 !== '') pid = (/^\d+$/.test(p2) ? Number(p2) : p2);
+        } else if (p1) {
+          pid = (/^\d+$/.test(p1) ? Number(p1) : p1);
+          if (p2 && knownSubs.includes(p2)) sub = p2;
+        }
+        if (!sub) sub = (v === 'admin' ? 'projects' : 'dashboard');
       } else {
         const rawPid = parts[1];
         pid = rawPid != null && rawPid !== '' ? (/^\d+$/.test(rawPid) ? Number(rawPid) : rawPid) : null;
@@ -9099,10 +9129,10 @@ function App(){
         view==='invest'&&h(InvestorAssistantFloat,{project:(chain.projects||[])[activeProject||0],chain}),
         view==='portfolio'&&h(PortfolioView,{chain,wallet,toast,go,liveMode,liveWalletAddr}),
         view==='market'&&h(MarketView,{chain,wallet,toast,initialPid:activeProject}),
-        view==='tokai'&&canAccessRole('tokai')&&h(TokaiView,{chain,toast,subView,go}),
+        view==='tokai'&&canAccessRole('tokai')&&h(TokaiView,{chain,toast,subView,go,activeProject}),
         view==='admin'&&canAccessRole('issuer')&&h(AdminView,{chain,wallet,toast,subView}),
         view==='guide'&&h(GuideView,{chain,role,go,setRole:activateRole}),
-        view==='thesis-editor'&&canAccessRole('tokai')&&h(ThesisFlexEditor,{chain,toast,go}),
+        view==='thesis-editor'&&canAccessRole('tokai')&&h(ThesisFlexEditor,{chain,toast,go,initialPid:activeProject}),
         view==='thesis-client'&&canAccessRole('issuer')&&h(ThesisClientView,{chain,toast}),
         view==='emission-engine'&&canAccessRole('tokai')&&h(EmissionPreview,{chain,toast}),
         view==='emission-checklist'&&canAccessRole('tokai')&&h(EmissionChecklist,{chain,toast}),
