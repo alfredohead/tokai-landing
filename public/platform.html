@@ -493,7 +493,11 @@ function useChain(opts){
     .then(function(data){
       if(Array.isArray(data.projects) && data.projects.length > 0){
         var mapped = data.projects.map(mapBackendProject);
-        setProjects(mapped);
+        var existingSyms = mapped.map(function(p){ return String(p.symbol||'').toUpperCase(); });
+        var missingInitial = INITIAL_PROJECTS.filter(function(initP){
+          return !existingSyms.includes(String(initP.symbol||'').toUpperCase());
+        });
+        setProjects(mapped.concat(missingInitial));
       }
     })
     .catch(function(){}); // silencioso — mantiene INITIAL_PROJECTS como fallback
@@ -6131,11 +6135,19 @@ function EmissionPreview({chain, toast}) {
     h('p',{className:'page-sub'},'La IA traduce las decisiones del wizard a parámetros técnicos de contrato. TOKAI revisa, edita si necesita, y aprueba. El emisor ve el resultado en lenguaje llano.'),
 
     // selector
-    projects.length > 1 && h('div',{style:{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}},
+    projects.length > 0 && h('div',{style:{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}},
       projects.map((pr,i)=>h('button',{key:i,onClick:()=>syncPid(i),
         style:{padding:'7px 13px',borderRadius:9,cursor:'pointer',fontSize:12,fontWeight:600,
           border:'1.5px solid '+(i===pid?'var(--emerald)':'var(--line-solid)'),
           background:i===pid?'rgba(0,214,126,.08)':'var(--panel)',color:i===pid?'var(--emerald)':'var(--txt)'}},pr.name))),
+
+    // Callout PRE-GAT si el proyecto es PRE-GAT / GAT / Soulbound
+    (p.symbol === 'GAT' || p.soulbound || /pre.gat|alyson/i.test(p.name||'')) && h('div',{className:'card',style:{marginBottom:14,background:'rgba(167,139,250,.06)',border:'1px solid rgba(167,139,250,.3)',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}},
+      h('div',{},
+        h('div',{style:{fontWeight:700,fontSize:13,color:'#A78BFA',display:'flex',alignItems:'center',gap:6}},'📜 Certificado Soulbound PRE-GAT (Fase 1 - Preventa)'),
+        h('div',{style:{fontSize:11.5,color:'var(--txt-dim)',marginTop:3}},'Este proyecto posee o admite emisión de certificados soulbound intransferibles ERC-721 en Polygon PoS mainnet.')),
+      h('button',{className:'btn btn-ghost btn-sm',style:{borderColor:'rgba(167,139,250,.4)',color:'#A78BFA'},onClick:()=>{ if(window.go) window.go('tokai', null, 'instrumentos'); }},'⚡ Administrar Minteo PRE-GAT On-Chain →')
+    ),
 
     // header proyecto
     h('div',{className:'card',style:{marginBottom:14,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}},
