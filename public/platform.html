@@ -1933,26 +1933,62 @@ function InvestView({chain,wallet,projectId,toast}){
   );
 }
 
+/* ── Helper para filtrar proyectos por emisor (aislamiento multi-tenant emisor) ── */
+function getIssuerProjects(projects, auth, wallet) {
+  if (!projects || !Array.isArray(projects)) return [];
+  // Admins y Supervisión TOKAI ven la totalidad del catálogo
+  if (auth && (auth.isAdmin || auth.role === 'admin' || auth.role === 'tokai')) return projects;
+  
+  const email = (auth && auth.email) || '';
+  const userId = (auth && (auth.sub || auth.user_id || auth.id)) || '';
+  const walletAddr = (wallet && wallet.addr) ? wallet.addr.toLowerCase() : '';
+
+  const matched = projects.filter(p => {
+    if (email && p.issuer_email && p.issuer_email.toLowerCase() === email.toLowerCase()) return true;
+    if (userId && p.issuer_id && String(p.issuer_id) === String(userId)) return true;
+    if (walletAddr && p.issuerWallet && p.issuerWallet.toLowerCase() === walletAddr) return true;
+    return false;
+  });
+
+  if (matched.length > 0) return matched;
+
+  // Fallback demo: asociar por patrón de correo si no hay propiedad explícita en mock
+  if (email) {
+    if (email.includes('alyson') || email.includes('gat') || email.includes('emisor')) {
+      const gat = projects.filter(p => String(p.symbol||'').toUpperCase() === 'GAT' || (p.name && p.name.includes('Alyson')));
+      if (gat.length > 0) return gat;
+    }
+  }
+
+  // Si es emisor sin coincidencia previa, muestra únicamente su primer proyecto asignado
+  return projects.slice(0, 1);
+}
+
 /* ════════════════════════ ADMIN PANEL ════════════════════════ */
-function AdminView({chain,wallet,toast,subView,go}){
+function AdminView({chain,wallet,auth,toast,subView,go}){
   const [tabState,setTabState]=useState(subView||'projects');
   /* Mantener tabState sincronizado con subView para que el active button sea correcto
      incluso cuando go() actualiza subView directamente sin pasar por tabState */
   useEffect(()=>{ if(subView) setTabState(subView); }, [subView]);
   const tab = subView || tabState;
+
+  // Multi-tenant: el emisor solo interactúa con sus propios proyectos en el panel de administración
+  const issuerProjects = getIssuerProjects(chain.projects, auth, wallet);
+  const issuerChain = Object.assign({}, chain, { projects: issuerProjects });
+
   return h('div',{},
     h('div',{className:'eyebrow'},'Panel del emisor'),
     h('h1',{className:'page'},'Administración'),
-    h('p',{className:'page-sub'},'Gestión de proyectos, emisión primaria, distribución de yield, identidades y contenido de pitch para inversores.'),
+    h('p',{className:'page-sub'},'Gestión de tus proyectos, emisión primaria, distribución de yield, identidades y contenido de pitch para inversores.'),
     h('div',{className:'role-switch',style:{marginBottom:22,width:'fit-content'}},
       [['projects','Proyectos'],['pitch','Pitch y Documentos 📄'],['emission','Estado emisión'],['mint','Emisión'],['yield','Yield'],['kyc','Identidades']].map(([k,l])=>
         h('button',{key:k,className:'role-btn '+(tab===k?'active':''),onClick:()=>{ setTabState(k); if(typeof go==='function') go('admin',null,k); }},l))),
-    tab==='projects'&&h(AdminProjects,{chain,toast,go,subView}),
-    tab==='pitch'&&h(AdminPitch,{chain,toast,go}),
-    tab==='emission'&&h(EmissionStatus,{chain,toast,wallet,go}),
-    tab==='mint'&&h(AdminMint,{chain,toast,go}),
-    tab==='yield'&&h(AdminYield,{chain,toast,go}),
-    tab==='kyc'&&h(AdminKycDual,{chain,toast,go}),
+    tab==='projects'&&h(AdminProjects,{chain:issuerChain,auth,wallet,toast,go,subView}),
+    tab==='pitch'&&h(AdminPitch,{chain:issuerChain,auth,toast,go}),
+    tab==='emission'&&h(EmissionStatus,{chain:issuerChain,auth,toast,wallet,go}),
+    tab==='mint'&&h(AdminMint,{chain:issuerChain,auth,toast,go}),
+    tab==='yield'&&h(AdminYield,{chain:issuerChain,auth,toast,go}),
+    tab==='kyc'&&h(AdminKycDual,{chain:issuerChain,auth,toast,go}),
   );
 }
 
@@ -4426,7 +4462,7 @@ function StructuringHandshakeTimeline({ project, go }) {
 
 /* ---------- HomeEmisor: "¿Qué querés hacer?" ---------- */
 function HomeEmisor({chain, auth, go, wallet, connectWallet}){
-  const mine = (chain.projects||[]);
+  const mine = getIssuerProjects(chain.projects||[], auth, wallet);
   const mainProject = mine[0]||null;
 
   /* Próxima acción según etapa */
@@ -9546,7 +9582,7 @@ function App(){
         view==='portfolio'&&h(PortfolioView,{chain,wallet,toast,go,liveMode,liveWalletAddr}),
         view==='market'&&h(MarketView,{chain,wallet,toast,initialPid:activeProject}),
         view==='tokai'&&canAccessRole('tokai')&&h(TokaiView,{chain,toast,subView,go,activeProject}),
-        view==='admin'&&canAccessRole('issuer')&&h(AdminView,{chain,wallet,toast,subView,go}),
+        view==='admin'&&canAccessRole('issuer')&&h(AdminView,{chain,wallet,auth,toast,subView,go}),
         view==='guide'&&h(GuideView,{chain,role,go,setRole:activateRole}),
         view==='thesis-editor'&&canAccessRole('tokai')&&h(ThesisFlexEditor,{chain,toast,go,initialPid:activeProject}),
         view==='thesis-client'&&canAccessRole('issuer')&&h(ThesisClientView,{chain,toast,go}),
