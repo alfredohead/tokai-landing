@@ -2398,6 +2398,8 @@ function AdminPitch({chain, toast, initialPid}){
     videoUrl:'', docs:[], scenarios:null
   };
   const [f,setF] = useState(initPitch);
+  const [showImport,setShowImport] = useState(false);
+  const [importProjectIdx,setImportProjectIdx] = useState(0);
   const upd = (k,v) => setF(s=>({...s,[k]:v}));
 
   // Cambio de proyecto
@@ -2433,6 +2435,7 @@ function AdminPitch({chain, toast, initialPid}){
         h('h1',{className:'page',style:{margin:0}},'Pitch del proyecto')
       ),
       h('div',{style:{display:'flex',gap:8}},
+        h('button',{className:'btn btn-ghost btn-sm',onClick:()=>setShowImport(!showImport)},'📥 Importar Pitch'),
         h('button',{className:'btn btn-ghost btn-sm',onClick:()=>{ if(typeof go==='function') go('admin',null,'projects'); }},'← Volver a Proyectos'),
         projects[pid]&&h('button',{className:'btn btn-primary btn-sm',onClick:()=>{ if(typeof go==='function') go('asset',projects[pid].id); }},'Ver Ficha del Inversor 👁️')
       )
@@ -2446,6 +2449,57 @@ function AdminPitch({chain, toast, initialPid}){
           border:'1.5px solid '+(i===pid?'var(--emerald)':'var(--line-solid)'),
           background:i===pid?'rgba(0,214,126,.08)':'var(--panel)',
           color:i===pid?'var(--emerald)':'var(--txt)'}},pr.name))),
+
+    /* importación de pitch */
+    showImport && h('div',{className:'card',style:{marginBottom:16,border:'1px solid var(--emerald)',background:'rgba(0,214,126,.02)'}},
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}},
+        h('div',{style:{fontWeight:700,fontSize:14,color:'var(--emerald)',display:'flex',alignItems:'center',gap:6}},'📥 Importar Pitch'),
+        h('button',{className:'btn btn-ghost btn-sm',onClick:()=>setShowImport(false)},'✕ Cerrar')
+      ),
+      h('div',{style:{display:'flex',gap:12,flexWrap:'wrap',alignItems:'flex-end'}},
+        h('div',{style:{flex:1,minWidth:220}},
+          h('label',{style:{fontSize:11.5,fontWeight:600,color:'var(--txt-mute)',display:'block',marginBottom:6}},'Copiar pitch de otro proyecto'),
+          h('select',{value:importProjectIdx,onChange:e=>setImportProjectIdx(+e.target.value),style:{width:'100%',padding:'8px 11px',borderRadius:8,background:'var(--black)',color:'var(--txt)',border:'1px solid var(--line-solid)'}},
+            projects.map((proj,i)=>h('option',{key:i,value:i,disabled:i===pid},proj.name+(i===pid?' (actual)':'')))
+          )
+        ),
+        h('button',{className:'btn btn-primary btn-sm',onClick:()=>{
+          const srcProj = projects[importProjectIdx];
+          if(!srcProj || !srcProj.pitch){
+            toast&&toast({type:'err',title:'Sin pitch',msg:'El proyecto seleccionado no posee un pitch configurado.'});
+            return;
+          }
+          const copied = JSON.parse(JSON.stringify(srcProj.pitch));
+          setF(copied);
+          setShowImport(false);
+          toast&&toast({title:'Pitch importado',msg:`Se importaron los datos de pitch de ${srcProj.name}`});
+        }},'Importar desde proyecto'),
+        h('label',{className:'btn btn-ghost btn-sm',style:{cursor:'pointer',display:'inline-flex',alignItems:'center',gap:6,padding:'8px 14px',border:'1px dashed var(--emerald)',color:'var(--emerald)'}},
+          '📂 Archivo .json',
+          h('input',{type:'file',accept:'.json',style:{display:'none'},onChange:e=>{
+            const file = e.target.files && e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt){
+              try {
+                const data = JSON.parse(evt.target.result);
+                const pitchData = data.pitch || data;
+                if(pitchData.headline || pitchData.porque || pitchData.bullets){
+                  setF(s=>({...s, ...pitchData}));
+                  setShowImport(false);
+                  toast&&toast({title:'Pitch cargado',msg:`Se importaron los datos desde ${file.name}`});
+                } else {
+                  toast&&toast({type:'err',title:'Error',msg:'El JSON no contiene campos de pitch válidos.'});
+                }
+              } catch(err) {
+                toast&&toast({type:'err',title:'Error JSON',msg:'No se pudo leer el archivo JSON.'});
+              }
+            };
+            reader.readAsText(file);
+          }})
+        )
+      )
+    ),
 
     h('div',{style:{display:'grid',gap:14}},
 
@@ -5029,6 +5083,101 @@ async function callTokaiAgent(userMsg, projectContext){
   return data.text || 'Sin respuesta.';
 }
 
+/* ─── Helpers de importación / exportación de Tesis de Valor ─── */
+function downloadFile(filename, text, mimeType) {
+  try {
+    const blob = new Blob([text], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch(e) {}
+}
+
+function parseJsonToBlocks(jsonText) {
+  try {
+    const data = JSON.parse(jsonText);
+    if (Array.isArray(data)) return data;
+    if (data.blocks && Array.isArray(data.blocks)) return data.blocks;
+    if (data.thesis && Array.isArray(data.thesis.blocks)) return data.thesis.blocks;
+  } catch(e) {}
+  return null;
+}
+
+function parseMarkdownToBlocks(mdText) {
+  if (!mdText || typeof mdText !== 'string') return null;
+  const lines = mdText.split('\n');
+  const blocks = [];
+  let currentBlock = null;
+
+  for (let line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ')) {
+      if (currentBlock) blocks.push(currentBlock);
+      const title = trimmed.replace(/^#+\s*/, '');
+      currentBlock = {
+        id: 'b' + Date.now() + Math.random().toString(36).slice(2, 6),
+        tipo: 'texto',
+        titulo: title,
+        contenido: '',
+        aiAssisted: false
+      };
+    } else if (currentBlock) {
+      if (trimmed.startsWith('✓ ') || trimmed.startsWith('- [x]') || trimmed.startsWith('* [x]')) {
+        if (currentBlock.tipo !== 'lista_si') {
+          currentBlock.tipo = 'lista_si';
+          currentBlock.items = [];
+        }
+        currentBlock.items.push(trimmed.replace(/^✓\s*|^-\s*\[x\]\s*|^\*\s*\[x\]\s*/i, ''));
+      } else if (trimmed.startsWith('✗ ') || trimmed.startsWith('- [ ]') || trimmed.startsWith('* [ ]')) {
+        if (currentBlock.tipo !== 'lista_no') {
+          currentBlock.tipo = 'lista_no';
+          currentBlock.items = [];
+        }
+        currentBlock.items.push(trimmed.replace(/^✗\s*|^-\s*\[ \]\s*|^\*\s*\[ \]\s*/i, ''));
+      } else if (trimmed.includes(':') && (trimmed.startsWith('**') || trimmed.startsWith('- **') || !trimmed.includes(' '))) {
+        if (currentBlock.tipo !== 'kv') {
+          currentBlock.tipo = 'kv';
+          currentBlock.pairs = [];
+        }
+        const clean = trimmed.replace(/^-\s*/, '');
+        const parts = clean.split(':');
+        const k = parts[0].replace(/\*\*/g, '').trim();
+        const v = parts.slice(1).join(':').replace(/\*\*/g, '').trim();
+        currentBlock.pairs.push([k, v]);
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        if (currentBlock.tipo !== 'lista_si' && currentBlock.tipo !== 'lista_no') {
+          currentBlock.tipo = 'lista_si';
+          currentBlock.items = [];
+        }
+        currentBlock.items.push(trimmed.replace(/^[-*]\s*/, ''));
+      } else {
+        if (currentBlock.tipo === 'texto' || currentBlock.tipo === 'alerta') {
+          currentBlock.contenido = currentBlock.contenido ? currentBlock.contenido + '\n' + trimmed : trimmed;
+        } else {
+          currentBlock.contenido = (currentBlock.contenido || '') + '\n' + trimmed;
+        }
+      }
+    } else {
+      currentBlock = {
+        id: 'b' + Date.now() + Math.random().toString(36).slice(2, 6),
+        tipo: 'texto',
+        titulo: 'Introducción',
+        contenido: trimmed,
+        aiAssisted: false
+      };
+    }
+  }
+  if (currentBlock) blocks.push(currentBlock);
+  return blocks.length > 0 ? blocks : null;
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    ThesisFlexEditor — formulario flexible con IA
    ═══════════════════════════════════════════════════════════════════ */
@@ -5061,6 +5210,11 @@ function ThesisFlexEditor({chain, toast, go, initialPid}){
   const [chatInput,setChatInput] = useState('');
   const [showAddBlock,setShowAddBlock] = useState(false);
   const [showExport,setShowExport] = useState(false);
+  const [showImport,setShowImport] = useState(false);
+  const [importMode,setImportMode] = useState('file'); // 'file' | 'project' | 'paste'
+  const [importProjectIdx,setImportProjectIdx] = useState(0);
+  const [importAction,setImportAction] = useState('replace'); // 'replace' | 'append'
+  const [importPasteText,setImportPasteText] = useState('');
 
   /* sincronizar proyecto cuando cambia initialPid o al seleccionar */
   function syncProject(targetPid){
@@ -5220,6 +5374,7 @@ Solo el JSON, sin texto adicional.`;
         onClick:autoComplete,title:'La IA lee los datos del proyecto y pre-completa todos los campos'},
         aiLoading==='auto'?'Generando…':'✦ Pre-completar con IA'),
       !isLocked && h('button',{className:'btn btn-ghost btn-sm',onClick:()=>setChatOpen(!chatOpen)},'💬 Chat agente'),
+      !isLocked && h('button',{className:'btn btn-ghost btn-sm',onClick:()=>setShowImport(!showImport)},'📥 Importar'),
       h('button',{className:'btn btn-ghost btn-sm',onClick:()=>setShowExport(!showExport)},'↗ Exportar'),
       !isLocked && canSend && h('button',{className:'btn btn-primary btn-sm',onClick:()=>{setThesisState('enviada');save(blocks,'enviada');toast&&toast({title:'Tesis enviada al cliente',msg:'Puede revisarla y confirmar desde su panel.'});}},
         'Enviar al cliente →'),
@@ -5245,13 +5400,115 @@ Solo el JSON, sin texto adicional.`;
             h('button',{className:'btn btn-ghost btn-sm',onClick:()=>setShowPause(false)},'Cancelar'))),
         emPaused&&p.emissionPauseReason&&h('div',{style:{marginTop:8,fontSize:11.5,color:'#FF5C5C',padding:'6px 10px',background:'rgba(255,92,92,.08)',borderRadius:6}},'⚠ Razón: '+p.emissionPauseReason))),
 
+    /* importación */
+    showImport && h('div',{className:'card',style:{marginBottom:14,border:'1px solid var(--emerald)',background:'rgba(0,214,126,.02)'}},
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}},
+        h('div',{style:{fontWeight:700,fontSize:14,color:'var(--emerald)',display:'flex',alignItems:'center',gap:6}},'📥 Importar Tesis de Valor'),
+        h('button',{className:'btn btn-ghost btn-sm',onClick:()=>setShowImport(false)},'✕ Cerrar')
+      ),
+      h('p',{style:{fontSize:12,color:'var(--txt-dim)',marginBottom:12,lineHeight:1.5}},
+        'Podés cargar bloques de tesis desde un archivo local (.json o .md), clonar la tesis de otro proyecto cargado en la plataforma, o pegar texto formateado.'),
+
+      h('div',{style:{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap'}},
+        h('button',{className:'btn btn-sm '+(importMode==='file'?'btn-primary':'btn-ghost'),onClick:()=>setImportMode('file')},'📁 Archivo (.json / .md)'),
+        h('button',{className:'btn btn-sm '+(importMode==='project'?'btn-primary':'btn-ghost'),onClick:()=>setImportMode('project')},'📋 Copiar de otro proyecto'),
+        h('button',{className:'btn btn-sm '+(importMode==='paste'?'btn-primary':'btn-ghost'),onClick:()=>setImportMode('paste')},'✏️ Pegar texto')
+      ),
+
+      h('div',{style:{display:'flex',gap:12,alignItems:'center',marginBottom:14,background:'var(--black)',padding:'8px 12px',borderRadius:8,border:'1px solid var(--line-solid)'}},
+        h('span',{style:{fontSize:11.5,fontWeight:600,color:'var(--txt-mute)'}},'Acción:'),
+        h('label',{style:{fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',gap:4,color:'var(--txt)'}},
+          h('input',{type:'radio',name:'impAct',checked:importAction==='replace',onChange:()=>setImportAction('replace')}),' Reemplazar tesis actual'),
+        h('label',{style:{fontSize:12,cursor:'pointer',display:'flex',alignItems:'center',gap:4,color:'var(--txt)'}},
+          h('input',{type:'radio',name:'impAct',checked:importAction==='append',onChange:()=>setImportAction('append')}),' Anexar a bloques existentes')
+      ),
+
+      importMode==='file' && h('div',{},
+        h('label',{className:'btn btn-ghost btn-sm',style:{cursor:'pointer',display:'inline-flex',alignItems:'center',gap:6,padding:'8px 14px',border:'1px dashed var(--emerald)',color:'var(--emerald)'}},
+          '📂 Seleccionar archivo .json o .md',
+          h('input',{type:'file',accept:'.json,.md,.txt',style:{display:'none'},onChange:e=>{
+            const file = e.target.files && e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt){
+              const content = evt.target.result;
+              let newBlocks = null;
+              if(file.name.endsWith('.json')){
+                newBlocks = parseJsonToBlocks(content);
+              }
+              if(!newBlocks){
+                newBlocks = parseMarkdownToBlocks(content);
+              }
+              if(newBlocks && newBlocks.length > 0){
+                const finalBlocks = importAction==='replace' ? newBlocks : [...blocks, ...newBlocks];
+                setBlocks(finalBlocks);
+                save(finalBlocks, thesisState);
+                setShowImport(false);
+                toast&&toast({title:'Tesis importada exitosamente',msg:`Se cargaron ${newBlocks.length} bloques desde ${file.name}`});
+              } else {
+                toast&&toast({type:'err',title:'Error de importación',msg:'No se reconocieron bloques válidos en el archivo.'});
+              }
+            };
+            reader.readAsText(file);
+          }})
+        )
+      ),
+
+      importMode==='project' && h('div',{},
+        h('div',{className:'field',style:{marginBottom:12}},
+          h('label',{},'Seleccionar proyecto de origen'),
+          h('select',{value:importProjectIdx,onChange:e=>setImportProjectIdx(+e.target.value),style:{width:'100%',padding:'8px 11px',borderRadius:8,background:'var(--black)',color:'var(--txt)',border:'1px solid var(--line-solid)'}},
+            projects.map((proj,i)=>h('option',{key:i,value:i,disabled:i===pid},proj.name+(i===pid?' (actual)':' ('+(proj.thesis?.blocks?.length||0)+' bloques)')))
+          )
+        ),
+        h('button',{className:'btn btn-primary btn-sm',onClick:()=>{
+          const srcProj = projects[importProjectIdx];
+          if(!srcProj || !srcProj.thesis?.blocks || srcProj.thesis.blocks.length===0){
+            toast&&toast({type:'err',title:'Sin tesis',msg:'El proyecto seleccionado no posee una tesis configurada.'});
+            return;
+          }
+          const copiedBlocks = JSON.parse(JSON.stringify(srcProj.thesis.blocks));
+          copiedBlocks.forEach(b=>b.id='b'+Date.now()+Math.random().toString(36).slice(2,6));
+          const finalBlocks = importAction==='replace' ? copiedBlocks : [...blocks, ...copiedBlocks];
+          setBlocks(finalBlocks);
+          save(finalBlocks, thesisState);
+          setShowImport(false);
+          toast&&toast({title:'Tesis clonada',msg:`Se importaron ${copiedBlocks.length} bloques desde ${srcProj.name}`});
+        }},'Importar bloques de este proyecto')
+      ),
+
+      importMode==='paste' && h('div',{},
+        h('textarea',{rows:6,value:importPasteText,onChange:e=>setImportPasteText(e.target.value),
+          placeholder:'Pegá aquí el texto en Markdown o el JSON de la tesis…',
+          style:{width:'100%',padding:'8px 11px',borderRadius:8,background:'var(--black)',color:'var(--txt)',fontFamily:'var(--mono)',fontSize:11.5,border:'1px solid var(--line-solid)',boxSizing:'border-box',marginBottom:10}}),
+        h('button',{className:'btn btn-primary btn-sm',onClick:()=>{
+          if(!importPasteText.trim()) return;
+          let newBlocks = parseJsonToBlocks(importPasteText) || parseMarkdownToBlocks(importPasteText);
+          if(newBlocks && newBlocks.length > 0){
+            const finalBlocks = importAction==='replace' ? newBlocks : [...blocks, ...newBlocks];
+            setBlocks(finalBlocks);
+            save(finalBlocks, thesisState);
+            setShowImport(false);
+            setImportPasteText('');
+            toast&&toast({title:'Tesis importada',msg:`Se procesaron ${newBlocks.length} bloques correctamente.`});
+          } else {
+            toast&&toast({type:'err',title:'Formato no válido',msg:'No se pudieron extraer bloques del texto pegado.'});
+          }
+        }},'Procesar e importar')
+      )
+    ),
+
     /* exportar */
     showExport && h('div',{className:'card',style:{marginBottom:14}},
       h('div',{style:{fontWeight:700,fontSize:13,marginBottom:10}},'Exportar tesis'),
       h('textarea',{readOnly:true,rows:8,value:toMarkdown(),style:{...fs,fontFamily:'var(--mono)',fontSize:11,color:'var(--txt-dim)'}}),
-      h('div',{style:{display:'flex',gap:8,marginTop:8}},
+      h('div',{style:{display:'flex',gap:8,marginTop:8,flexWrap:'wrap'}},
         h('button',{className:'btn btn-ghost btn-sm',onClick:()=>{navigator.clipboard&&navigator.clipboard.writeText(toMarkdown());toast&&toast({title:'Copiado',msg:'Tesis copiada como Markdown'});}},
           'Copiar Markdown'),
+        h('button',{className:'btn btn-ghost btn-sm',onClick:()=>downloadFile('tesis-'+(p.name||'proyecto').toLowerCase().replace(/\s+/g,'-')+'.md', toMarkdown(), 'text/markdown')},
+          'Descargar .md ⬇'),
+        h('button',{className:'btn btn-ghost btn-sm',onClick:()=>downloadFile('tesis-'+(p.name||'proyecto').toLowerCase().replace(/\s+/g,'-')+'.json', JSON.stringify({blocks, estado: thesisState}, null, 2), 'application/json')},
+          'Descargar .json ⬇'),
         h('button',{className:'btn btn-ghost btn-sm',onClick:()=>setShowExport(false)},'Cerrar'))),
 
     /* bloques */
