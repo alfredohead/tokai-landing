@@ -1930,29 +1930,33 @@ function InvestView({chain,wallet,projectId,toast}){
 }
 
 /* ════════════════════════ ADMIN PANEL ════════════════════════ */
-function AdminView({chain,wallet,toast,subView}){
-  const [tabState,setTabState]=useState('projects');
+function AdminView({chain,wallet,toast,subView,go}){
+  const [tabState,setTabState]=useState(subView||'projects');
+  /* Mantener tabState sincronizado con subView para que el active button sea correcto
+     incluso cuando go() actualiza subView directamente sin pasar por tabState */
+  useEffect(()=>{ if(subView) setTabState(subView); }, [subView]);
   const tab = subView || tabState;
   return h('div',{},
     h('div',{className:'eyebrow'},'Panel del emisor'),
     h('h1',{className:'page'},'Administración'),
     h('p',{className:'page-sub'},'Gestión de proyectos, emisión primaria, distribución de yield, identidades y contenido de pitch para inversores.'),
-    !subView && h('div',{className:'role-switch',style:{marginBottom:22,width:'fit-content'}},
+    h('div',{className:'role-switch',style:{marginBottom:22,width:'fit-content'}},
       [['projects','Proyectos'],['pitch','Pitch y Documentos 📄'],['emission','Estado emisión'],['mint','Emisión'],['yield','Yield'],['kyc','Identidades']].map(([k,l])=>
-        h('button',{key:k,className:'role-btn '+(tab===k?'active':''),onClick:()=>setTabState(k)},l))),
-    tab==='projects'&&h(AdminProjects,{chain,toast,go}),
-    tab==='pitch'&&h(AdminPitch,{chain,toast}),
-    tab==='emission'&&h(EmissionStatus,{chain,toast,wallet}),
-    tab==='mint'&&h(AdminMint,{chain,toast}),
-    tab==='yield'&&h(AdminYield,{chain,toast}),
-    tab==='kyc'&&h(AdminKycDual,{chain,toast}),
+        h('button',{key:k,className:'role-btn '+(tab===k?'active':''),onClick:()=>{ setTabState(k); if(typeof go==='function') go('admin',null,k); }},l))),
+    tab==='projects'&&h(AdminProjects,{chain,toast,go,subView}),
+    tab==='pitch'&&h(AdminPitch,{chain,toast,go}),
+    tab==='emission'&&h(EmissionStatus,{chain,toast,wallet,go}),
+    tab==='mint'&&h(AdminMint,{chain,toast,go}),
+    tab==='yield'&&h(AdminYield,{chain,toast,go}),
+    tab==='kyc'&&h(AdminKycDual,{chain,toast,go}),
   );
 }
 
-function AdminProjects({chain,toast,go}){
+function AdminProjects({chain,toast,go,subView}){
   const [show,setShow]=useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [deletingProject, setDeletingProject] = useState(null);
+  useEffect(()=>{ setEditingProject(null); setShow(false); }, [subView]);
   const [f,setF]=useState({name:'',symbol:'',vertical:'Inmobiliario',price:3000,maxSupply:1000,soulbound:false,lockupDays:0,maxHolders:0,jurisdictions:[32],regime:'RG 1088 (Oferta privada)',color:'#1a6e3a',desc:'',coverImage:null,gallery:[]});
   function readFile(file,cb){
     if(!file)return;
@@ -2019,7 +2023,10 @@ function AdminProjects({chain,toast,go}){
 
     // FORMULARIO DE EDICIÓN
     editingProject&&h('div',{className:'card',style:{marginBottom:16, border:'1.5px solid var(--emerald)'}},
-      h('h3',{style:{fontSize:15,fontWeight:700,marginBottom:10,color:'var(--emerald)'}},'Editar parámetros de proyecto'),
+      h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}},
+        h('h3',{style:{fontSize:15,fontWeight:700,margin:0,color:'var(--emerald)'}},'Editar parámetros de proyecto'),
+        h('button',{className:'btn btn-ghost btn-sm',onClick:()=>setEditingProject(null)},'← Volver a la lista')
+      ),
       
       // Banner de advertencia si está desplegado
       (editingProject.tokenDeployed || (editingProject.token && editingProject.token !== '—' && !editingProject.token.startsWith('0x0000000000000000000000000000000000000000'))) &&
@@ -2044,11 +2051,13 @@ function AdminProjects({chain,toast,go}){
           h('input',{type:'checkbox',style:{width:'auto'},checked:editingProject.soulbound,disabled:(editingProject.tokenDeployed || (editingProject.token && editingProject.token !== '—' && !editingProject.token.startsWith('0x0000000000000000000000000000000000000000'))),onChange:e=>setEditingProject({...editingProject,soulbound:e.target.checked})}),'Soulbound (intransferible · Howey-safe)'),
       ),
       h('div',{style:{marginTop:8}},h('label',{style:{fontSize:12,fontWeight:600,color:'var(--txt-dim)',display:'block',marginBottom:8}},'Jurisdicciones habilitadas'),
-        h('div',{className:'pill-row'},Object.entries(JUR).map(([code,name])=>{const c=+code;const on=editingProject.jurisdictions.includes(c);
+        h('div',{className:'pill-row'},Object.entries(JUR).map(([code,name])=>{const c=+code;
+          const jurList = Array.isArray(editingProject.jurisdictions) ? editingProject.jurisdictions : [32];
+          const on = jurList.includes(c);
           const disabled = (editingProject.tokenDeployed || (editingProject.token && editingProject.token !== '—' && !editingProject.token.startsWith('0x0000000000000000000000000000000000000000')));
           return h('button',{key:c,className:'badge '+(on?'green':'gray'),style:{cursor:disabled?'not-allowed':'pointer',padding:'6px 11px',opacity:disabled?0.6:1},
             disabled: disabled,
-            onClick:()=>setEditingProject({...editingProject,jurisdictions:on?editingProject.jurisdictions.filter(x=>x!==c):[...editingProject.jurisdictions,c]})},name);})),
+            onClick:()=>setEditingProject({...editingProject,jurisdictions:on?jurList.filter(x=>x!==c):[...jurList,c]})},name);})),
       ),
       h('div',{style:{marginTop:16,paddingTop:16,borderTop:'1px solid var(--line)'}},
         h('label',{style:{fontSize:12,fontWeight:600,color:'var(--txt-dim)',display:'block',marginBottom:10}},'Fotos del proyecto (Portada y Galería)'),
@@ -2162,7 +2171,8 @@ function AdminProjects({chain,toast,go}){
                   price: p.priceUsdCents ? p.priceUsdCents / 100 : (p.price || 0),
                   desc: p.description || p.desc || '',
                   coverImage: p.coverImage || (p.meta && p.meta.coverImage) || null,
-                  gallery: p.gallery || (p.meta && p.meta.gallery) || []
+                  gallery: p.gallery || (p.meta && p.meta.gallery) || [],
+                  jurisdictions: Array.isArray(p.jurisdictions) ? p.jurisdictions : (Array.isArray(p.jurisdiction) ? p.jurisdiction : [32])
                 });
               }},'Editar'),
               h('button',{
@@ -2417,8 +2427,16 @@ function AdminPitch({chain, toast, initialPid}){
   const DOC_ICONS = {pdf:'📄',imagen:'🖼️',term_sheet:'📋',memoria:'📝',render:'🏗️',otro:'📎'};
 
   return h('div',{},
-    h('div',{className:'eyebrow'},'Contenido para inversores'),
-    h('h1',{className:'page'},'Pitch del proyecto'),
+    h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14,flexWrap:'wrap',gap:10}},
+      h('div',{},
+        h('div',{className:'eyebrow'},'Contenido para inversores'),
+        h('h1',{className:'page',style:{margin:0}},'Pitch del proyecto')
+      ),
+      h('div',{style:{display:'flex',gap:8}},
+        h('button',{className:'btn btn-ghost btn-sm',onClick:()=>{ if(typeof go==='function') go('admin',null,'projects'); }},'← Volver a Proyectos'),
+        projects[pid]&&h('button',{className:'btn btn-primary btn-sm',onClick:()=>{ if(typeof go==='function') go('asset',projects[pid].id); }},'Ver Ficha del Inversor 👁️')
+      )
+    ),
     h('p',{className:'page-sub'},'Este contenido aparece en la ficha del proyecto cuando el inversor hace click en el CTA del widget. Es tu espacio para convencer. TOKAI no edita esto — es tu voz como emisor.'),
 
     // selector de proyecto
@@ -5329,7 +5347,7 @@ Solo el JSON, sin texto adicional.`;
 
 /* ─── System prompt del asistente para el CLIENTE ─── */
 
-function ThesisClientView({chain, toast}){
+function ThesisClientView({chain, toast, go}){
   const projects = chain.projects||[];
   const visible = projects.filter(p=>p.thesis&&['enviada','confirmada','revision_solicitada'].includes(p.thesis.estado));
   const [pid,setPid] = useState(visible[0]?.id??null);
@@ -5350,16 +5368,26 @@ function ThesisClientView({chain, toast}){
   }
 
   if(!visible.length) return h('div',{},
-    h('div',{className:'eyebrow'},'Mi proyecto'),
-    h('h1',{className:'page'},'Tesis de Valor'),
+    h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}},
+      h('div',{},
+        h('div',{className:'eyebrow'},'Mi proyecto'),
+        h('h1',{className:'page',style:{margin:0}},'Tesis de Valor')
+      ),
+      typeof go==='function'&&h('button',{className:'btn btn-ghost btn-sm',onClick:()=>go('admin',null,'projects')},'← Volver a Administración')
+    ),
     h('div',{className:'card',style:{textAlign:'center',padding:'32px'}},
       h('div',{style:{fontSize:32,marginBottom:10}},'📋'),
       h('div',{style:{fontWeight:700,marginBottom:6}},'Tesis pendiente de revisión'),
       h('div',{style:{fontSize:12.5,color:'var(--txt-dim)',lineHeight:1.5}},'TOKAI completará la tesis durante las rondas de estructuración. Cuando esté lista, la verás aquí para confirmar antes de emitir.')));
 
   return h('div',{},
-    h('div',{className:'eyebrow'},'Mi proyecto'),
-    h('h1',{className:'page'},'Tesis de Valor'),
+    h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14,flexWrap:'wrap',gap:10}},
+      h('div',{},
+        h('div',{className:'eyebrow'},'Mi proyecto'),
+        h('h1',{className:'page',style:{margin:0}},'Tesis de Valor')
+      ),
+      typeof go==='function'&&h('button',{className:'btn btn-ghost btn-sm',onClick:()=>go('admin',null,'projects')},'← Volver a Administración')
+    ),
     h('p',{className:'page-sub'},'TOKAI definió el modelo de negocio, los derechos del token y la estructura legal. Revisá cada punto y confirmá para habilitar la emisión.'),
     visible.length>1&&h('div',{style:{display:'flex',gap:8,marginBottom:14,flexWrap:'wrap'}},
       visible.map(pr=>h('button',{key:pr.id,onClick:()=>{setPid(pr.id);setChecked(false);},style:{padding:'7px 13px',borderRadius:9,cursor:'pointer',fontSize:12,fontWeight:600,border:'1.5px solid '+(pr.id===pid?'var(--emerald)':'var(--line-solid)'),background:pr.id===pid?'rgba(0,214,126,.08)':'var(--panel)',color:pr.id===pid?'var(--emerald)':'var(--txt)'}},pr.name))),
@@ -8924,49 +8952,17 @@ function App(){
   }
   function confirmRealMode(){ setShowRealConfirm(false); setMode('real'); }
 
-  function go(v,pid,sub){
-    let path = v;
-    if (['admin','tokai'].includes(v)) {
-      if (sub != null) path += `/${sub}`;
-      if (pid != null) path += `/${pid}`;
-    } else {
-      if (pid != null) path += `/${pid}`;
-      if (sub != null) path += `/${sub}`;
-    }
-    window.location.hash = `/${path}`;
-    setSidebarOpen(false);
-  }
-
-  /* Cierra la sesión en este dispositivo: limpia la cookie HttpOnly en el
-     backend y el JWT de respaldo en localStorage (usado como fallback cross-origin).
-     Sin esto, un token guardado sigue autenticando por su vigencia completa aunque
-     el usuario "cierre" la pestaña — no hay otra forma de invalidar la sesión local. */
-  function doLogout(){
-    if(window.__API_URL__){
-      fetch(window.__API_URL__ + '/auth/logout', { method:'POST', credentials:'include' }).catch(function(){});
-    }
-    try{ localStorage.removeItem('tokai_jwt'); }catch(e){}
-    setAuth(null);
-    setPaid(false);
-    setSidebarOpen(false);
-    window.location.hash = '';
-  }
-
-  /* ── Guardas de rol: la wallet demo solo habilita el perfil Inversor ── */
   function canAccessRole(targetRole){
-    if(targetRole==='investor') return true;
     if(!auth) return false;
-    if(auth.isAdmin || auth.role==='tokai') return true;
-    if(auth.method==='wallet') return false;
-    if(targetRole==='issuer') return auth.role==='issuer' && (auth.approved || paid);
+    if(auth.isAdmin || auth.role==='admin' || auth.role==='tokai') return true;
+    if(targetRole==='investor') return true;
+    if(targetRole==='issuer') return !!(auth.approved || auth.role==='issuer');
+    if(targetRole==='tokai') return false;
     return false;
   }
 
   function denyRole(targetRole){
-    const label = targetRole==='tokai' ? 'TOKAI' : targetRole==='issuer' ? 'Emisor' : 'Inversor';
-    toast&&toast({type:'warn',title:'Acceso restringido',msg:'La wallet demo solo habilita el perfil Inversor. El perfil '+label+' requiere una cuenta aprobada.'});
-    setRole('investor');
-    go('dash');
+    toast&&toast({type:'err',title:'Acceso denegado',msg:'No tenés permisos para acceder a '+targetRole});
   }
 
   function activateRole(targetRole){
@@ -8978,59 +8974,80 @@ function App(){
     return true;
   }
 
-  /* Efecto para sincronizar el estado de React con el Hash de la URL */
-  useEffect(() => {
-    function handleHashChange() {
-      const hash = window.location.hash.replace('#/', '').replace('#', '');
-      if (!hash) {
-        const defaultView = role === 'tokai' ? 'tokai' : (role === 'issuer' ? 'home' : 'dash');
-        const defaultSub = role === 'tokai' ? 'dashboard' : 'projects';
-        setView(defaultView);
-        setSubView(defaultSub);
-        return;
-      }
-      const parts = hash.split('/');
-      const v = parts[0];
+  function doLogout(){
+    localStorage.removeItem('tokai_jwt');
+    if(window.__API_URL__){
+      fetch(window.__API_URL__ + '/auth/logout', { method: 'POST', credentials: 'include' }).catch(function(){});
+    }
+    setAuth(null);
+    setRole('issuer');
+    setView('home');
+    setPaid(false);
+  }
 
-      if((v==='tokai' && !canAccessRole('tokai')) || (v==='admin' && !canAccessRole('issuer'))){
-        denyRole(v==='tokai'?'tokai':'issuer');
-        return;
-      }
-
-      let pid = null;
-      let sub = null;
-
-      if (['admin', 'tokai'].includes(v)) {
-        const p1 = parts[1];
-        const p2 = parts[2];
-        const knownSubs = ['dashboard','psav','kyc','checklist','geofencing','accesos','captable','contracts','infra','instrumentos','thesis-editor','report-gen','emission-engine','projects','pitch','emission','mint','yield'];
-        if (p1 && knownSubs.includes(p1)) {
-          sub = p1;
-          if (p2 != null && p2 !== '') pid = (/^\d+$/.test(p2) ? Number(p2) : p2);
-        } else if (p1) {
-          pid = (/^\d+$/.test(p1) ? Number(p1) : p1);
-          if (p2 && knownSubs.includes(p2)) sub = p2;
-        }
-        if (!sub) sub = (v === 'admin' ? 'projects' : 'dashboard');
-      } else {
-        const rawPid = parts[1];
-        pid = rawPid != null && rawPid !== '' ? (/^\d+$/.test(rawPid) ? Number(rawPid) : rawPid) : null;
-        sub = parts[2] || null;
-      }
-
-      setView(v);
-      if (pid !== null) {
-        setActiveProject(pid);
-      }
-      if (sub !== null) {
-        setSubView(sub);
-      }
+  /* go() actualiza React state directamente + sincroniza el hash.
+     Esto evita dependencia en el evento nativo 'hashchange', que el
+     navegador no dispara cuando la URL destino es idéntica a la actual
+     (p.ej.: clic en "Administración" cuando el hash ya es #/admin). */
+  function go(v, pid, sub) {
+    /* 1. Construir el hash destino */
+    let path = v;
+    if (['admin','tokai'].includes(v)) {
+      const resolvedSub = sub != null ? sub : (v === 'admin' ? 'projects' : 'dashboard');
+      path += `/${resolvedSub}`;
+      if (pid != null) path += `/${pid}`;
+    } else {
+      if (pid != null) path += `/${pid}`;
+      if (sub != null) path += `/${sub}`;
     }
 
-    window.addEventListener('hashchange', handleHashChange);
-    handleHashChange();
+    /* 2. Actualizar React state INMEDIATAMENTE (no esperar evento del DOM) */
+    const resolvedSub = ['admin','tokai'].includes(v)
+      ? (sub != null ? sub : (v === 'admin' ? 'projects' : 'dashboard'))
+      : (sub || null);
 
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    if ((v === 'tokai' && !canAccessRole('tokai')) || (v === 'admin' && !canAccessRole('issuer'))) {
+      denyRole(v === 'tokai' ? 'tokai' : 'issuer');
+      return;
+    }
+
+    setView(v);
+    if (resolvedSub !== null) setSubView(resolvedSub);
+    if (pid !== null && pid !== undefined) setActiveProject(pid);
+
+    /* 3. Sincronizar la URL (puede no disparar hashchange si es idéntica, pero el state ya está correcto) */
+    const targetHash = `/${path}`;
+    if (window.location.hash !== targetHash && window.location.hash !== `#${targetHash}`) {
+      window.location.hash = targetHash;
+    }
+
+    setSidebarOpen(false);
+  }
+
+  /* Efecto de sincronización al inicio y cuando cambia el rol/auth.
+     Permite que un deeplink o la recarga de la página restaure la vista correcta. */
+  useEffect(() => {
+    const hash = window.location.hash.replace(/^#\/?/, '');
+    if (!hash) return; /* go() ya estableció la vista por defecto en el login */
+    const parts = hash.split('/');
+    const v = parts[0];
+    const knownSubs = ['dashboard','psav','kyc','checklist','geofencing','accesos','captable','contracts','infra','instrumentos','thesis-editor','report-gen','emission-engine','projects','pitch','emission','mint','yield'];
+    let sub = null;
+    let pid = null;
+    if (['admin','tokai'].includes(v)) {
+      const p1 = parts[1]; const p2 = parts[2];
+      if (p1 && knownSubs.includes(p1)) { sub = p1; if (p2) pid = /^\d+$/.test(p2) ? Number(p2) : p2; }
+      else if (p1) { pid = /^\d+$/.test(p1) ? Number(p1) : p1; if (p2 && knownSubs.includes(p2)) sub = p2; }
+      if (!sub) sub = v === 'admin' ? 'projects' : 'dashboard';
+    } else {
+      const raw = parts[1];
+      pid = raw ? (/^\d+$/.test(raw) ? Number(raw) : raw) : null;
+      sub = parts[2] || null;
+    }
+    if ((v==='tokai' && !canAccessRole('tokai')) || (v==='admin' && !canAccessRole('issuer'))) return;
+    setView(v);
+    if (sub) setSubView(sub);
+    if (pid !== null) setActiveProject(pid);
   }, [role, auth, paid]);
 
   /* ── Restore de sesión desde cookie HttpOnly ── */
@@ -9211,10 +9228,10 @@ function App(){
         view==='portfolio'&&h(PortfolioView,{chain,wallet,toast,go,liveMode,liveWalletAddr}),
         view==='market'&&h(MarketView,{chain,wallet,toast,initialPid:activeProject}),
         view==='tokai'&&canAccessRole('tokai')&&h(TokaiView,{chain,toast,subView,go,activeProject}),
-        view==='admin'&&canAccessRole('issuer')&&h(AdminView,{chain,wallet,toast,subView}),
+        view==='admin'&&canAccessRole('issuer')&&h(AdminView,{chain,wallet,toast,subView,go}),
         view==='guide'&&h(GuideView,{chain,role,go,setRole:activateRole}),
         view==='thesis-editor'&&canAccessRole('tokai')&&h(ThesisFlexEditor,{chain,toast,go,initialPid:activeProject}),
-        view==='thesis-client'&&canAccessRole('issuer')&&h(ThesisClientView,{chain,toast}),
+        view==='thesis-client'&&canAccessRole('issuer')&&h(ThesisClientView,{chain,toast,go}),
         view==='emission-engine'&&canAccessRole('tokai')&&h(EmissionPreview,{chain,toast}),
         view==='emission-checklist'&&canAccessRole('tokai')&&h(EmissionChecklist,{chain,toast}),
         view==='report-gen'&&canAccessRole('tokai')&&h(ReportExporter,{chain,toast})
