@@ -66,36 +66,37 @@ REGLAS DE RESPUESTA:
 - Respuestas directas, claras y ágiles. Evitá bloques masivos de texto o explicaciones teóricas extensas.
 - Si el usuario es un Emisor o empresa con un proyecto real, recomendale ingresar a la [Plataforma TOKAI](https://tokairwa.com/platform.html) para completar la encuesta del Wizard de Emisión o contactar a tokairwa@gmail.com / Instagram @tokairwa.`;
 
-  const fallbackKey = ['gsk_E5z7Q6JR4od', '6NOCEwhHZWGdyb3', 'FYaRrLd3zr6bYjj', 'KOZtR8S6CgL'].join('');
-  const GROQ_KEY = process.env.GROQ_API_KEY || fallbackKey;
+  const GROQ_KEY = cleanEnv(process.env.GROQ_API_KEY);
 
   // 1. Inferencia LPU ultra-rápida directa a Groq API (~500ms a 800ms)
-  try {
-    const groqController = new AbortController();
-    const groqTimer = setTimeout(() => groqController.abort(), 7000);
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GROQ_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        max_tokens: 512,
-        temperature: 0.3,
-        messages: [{ role: 'system', content: SYSTEM }, ...messages]
-      }),
-      signal: groqController.signal
-    });
-    clearTimeout(groqTimer);
+  if (GROQ_KEY) {
+    try {
+      const groqController = new AbortController();
+      const groqTimer = setTimeout(() => groqController.abort(), 7000);
+      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          max_tokens: 512,
+          temperature: 0.3,
+          messages: [{ role: 'system', content: SYSTEM }, ...messages]
+        }),
+        signal: groqController.signal
+      });
+      clearTimeout(groqTimer);
 
-    if (groqRes.ok) {
-      const groqData = await groqRes.json();
-      const reply = groqData.choices?.[0]?.message?.content?.trim();
-      if (reply) return res.status(200).json({ reply });
+      if (groqRes.ok) {
+        const groqData = await groqRes.json();
+        const reply = groqData.choices?.[0]?.message?.content?.trim();
+        if (reply) return res.status(200).json({ reply });
+      }
+    } catch (e) {
+      // Continuar a fallback de respaldo si Groq falla
     }
-  } catch (e) {
-    // Continuar a fallback de respaldo si Groq falla
   }
 
   // 2. Backup secundario: backend Fly.io
@@ -121,15 +122,15 @@ REGLAS DE RESPUESTA:
   const NVIDIA_FALLBACK_CHAIN = [
     {
       model: 'meta/llama-3.3-70b-instruct',
-      apiKey: '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',
+      apiKey: cleanEnv(process.env.NVIDIA_API_KEY_1),
       temp: 0.2, topP: 0.7
     },
     {
       model: 'mistralai/mistral-medium-3.5-128b',
-      apiKey: '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',
+      apiKey: cleanEnv(process.env.NVIDIA_API_KEY_2),
       temp: 0.7, topP: 1.0
     }
-  ];
+  ].filter(config => config.apiKey);
 
   for (const config of NVIDIA_FALLBACK_CHAIN) {
     const controller = new AbortController();
