@@ -20,6 +20,17 @@ TOKAI RWA designs, evaluates and structures real-world asset tokenization projec
 - Compliance for tokenized assets
 - KYC, AML, whitelist and transfer restrictions
 - Smart contract architecture for asset-backed instruments
+- Tokenized vehicle leasing and auto credit
+- Sports fan tokens
+- Tokenized stablecoins and yield tokens
+- Governance tokens and DAOs for RWA
+- Tokenized corporate debt and warrants
+- Hybrid tokens (utility + security + governance)
+- Public vs. private securities offerings (Argentina CNV)
+- Token standard comparison (ERC-20, ERC-1400, ERC-3643)
+- Legal vehicles for tokenization (fideicomiso financiero, SPV)
+- Token, NFT and security token classification
+- Secondary markets for security tokens
 
 ## Important Public Pages
 
@@ -32,6 +43,17 @@ TOKAI RWA designs, evaluates and structures real-world asset tokenization projec
 - ERC-3643: https://tokairwa.com/erc-3643/
 - Compliance RWA: https://tokairwa.com/compliance-rwa/
 - Tokenization in LATAM: https://tokairwa.com/tokenizacion-latam/
+- Vehicle leasing and auto credit tokenization: https://tokairwa.com/tokenizacion-vehicular/
+- Sports fan tokens: https://tokairwa.com/fan-tokens/
+- Stablecoins and yield tokens: https://tokairwa.com/stablecoins-tokenizadas/
+- Governance tokens and DAOs: https://tokairwa.com/tokens-gobernanza-dao/
+- Tokenized corporate debt: https://tokairwa.com/deuda-corporativa-tokenizada/
+- Hybrid tokens: https://tokairwa.com/tokens-hibridos/
+- Public vs. private offering (CNV RG 1069 vs RG 1088): https://tokairwa.com/oferta-publica-vs-privada/
+- ERC-3643 vs ERC-1400 vs ERC-20: https://tokairwa.com/erc-3643-vs-erc1400-vs-erc20/
+- Fideicomiso financiero vs SPV: https://tokairwa.com/fideicomiso-vs-spv/
+- Token vs NFT vs security token: https://tokairwa.com/token-vs-nft-vs-security-token/
+- Secondary market for security tokens: https://tokairwa.com/mercado-secundario-security-tokens/
 
 ## Contact
 
