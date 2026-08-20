@@ -67,6 +67,7 @@ REGLAS DE RESPUESTA:
 - Si el usuario es un Emisor o empresa con un proyecto real, recomendale ingresar a la [Plataforma TOKAI](https://tokairwa.com/platform.html) para completar la encuesta del Wizard de Emisión o contactar a tokairwa@gmail.com / Instagram @tokairwa.`;
 
   const GROQ_KEY = cleanEnv(process.env.GROQ_API_KEY);
+  if (!GROQ_KEY) console.warn('[chat] GROQ_API_KEY not set, skipping Groq');
 
   // 1. Inferencia LPU ultra-rápida directa a Groq API (~500ms a 800ms)
   if (GROQ_KEY) {
@@ -93,9 +94,13 @@ REGLAS DE RESPUESTA:
         const groqData = await groqRes.json();
         const reply = groqData.choices?.[0]?.message?.content?.trim();
         if (reply) return res.status(200).json({ reply });
+        console.error('[chat] Groq ok but no reply content', JSON.stringify(groqData).slice(0, 500));
+      } else {
+        const errBody = await groqRes.text().catch(() => '');
+        console.error('[chat] Groq failed', groqRes.status, errBody.slice(0, 500));
       }
     } catch (e) {
-      // Continuar a fallback de respaldo si Groq falla
+      console.error('[chat] Groq threw', e?.name, e?.message);
     }
   }
 
@@ -110,12 +115,14 @@ REGLAS DE RESPUESTA:
       signal: bkController.signal
     });
     clearTimeout(bkTimer);
-    const bkData = await bkRes.json().catch(() => ({}));
+    const bkText = await bkRes.text();
+    const bkData = (() => { try { return JSON.parse(bkText); } catch { return {}; } })();
     if (bkRes.ok && bkData.reply) {
       return res.status(200).json({ reply: bkData.reply });
     }
+    console.error('[chat] Fly.io backend failed', bkRes.status, bkText.slice(0, 500));
   } catch (e) {
-    // Continuar a NVIDIA NIM si el backend no responde
+    console.error('[chat] Fly.io backend threw', e?.name, e?.message);
   }
 
   // 3. Backup terciario: NVIDIA NIM direct
@@ -131,6 +138,8 @@ REGLAS DE RESPUESTA:
       temp: 0.7, topP: 1.0
     }
   ].filter(config => config.apiKey);
+
+  if (NVIDIA_FALLBACK_CHAIN.length === 0) console.warn('[chat] no NVIDIA_API_KEY_1/2 set, skipping NVIDIA fallback');
 
   for (const config of NVIDIA_FALLBACK_CHAIN) {
     const controller = new AbortController();
@@ -161,11 +170,17 @@ REGLAS DE RESPUESTA:
         const msgObj = data.choices?.[0]?.message;
         const reply = msgObj?.content?.trim();
         if (reply) return res.status(200).json({ reply });
+        console.error('[chat] NVIDIA ok but no reply content', config.model);
+      } else {
+        const errBody = await response.text().catch(() => '');
+        console.error('[chat] NVIDIA failed', config.model, response.status, errBody.slice(0, 500));
       }
     } catch (err) {
       clearTimeout(timer);
+      console.error('[chat] NVIDIA threw', config.model, err?.name, err?.message);
     }
   }
 
+  console.error('[chat] all providers exhausted, returning 500');
   return res.status(500).json({ error: 'Servicio de consulta ocupado momentáneamente. Por favor intentá de nuevo.' });
 }
