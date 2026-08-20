@@ -164,16 +164,13 @@ REGLAS DE RESPUESTA:
   }
 
   // 3. Backup terciario: NVIDIA NIM direct
+  // mistralai/mistral-medium-3.5-128b fue retirado del catálogo de NVIDIA (HTTP 410,
+  // confirmado en logs de producción el 2026-08-20) — sacado de la cadena.
   const NVIDIA_FALLBACK_CHAIN = [
     {
       model: 'meta/llama-3.3-70b-instruct',
       apiKey: cleanEnv(process.env.NVIDIA_API_KEY_1),
       temp: 0.2, topP: 0.7
-    },
-    {
-      model: 'mistralai/mistral-medium-3.5-128b',
-      apiKey: cleanEnv(process.env.NVIDIA_API_KEY_2),
-      temp: 0.7, topP: 1.0
     }
   ].filter(config => config.apiKey);
 
