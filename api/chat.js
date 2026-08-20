@@ -66,11 +66,15 @@ REGLAS DE RESPUESTA:
 - Respuestas directas, claras y ágiles. Evitá bloques masivos de texto o explicaciones teóricas extensas.
 - Si el usuario es un Emisor o empresa con un proyecto real, recomendale ingresar a la [Plataforma TOKAI](https://tokairwa.com/platform.html) para completar la encuesta del Wizard de Emisión o contactar a tokairwa@gmail.com / Instagram @tokairwa.`;
 
-  const TOKENROUTER_KEY = cleanEnv(process.env.TOKENROUTER_API_KEY);
-  if (!TOKENROUTER_KEY) console.warn('[chat] TOKENROUTER_API_KEY not set, skipping TokenRouter');
+  // 0. TokenRouter (OpenAI-compatible gateway) — intenta cada modelo/key configurado en orden
+  const TOKENROUTER_CHAIN = [
+    { model: 'qwen/qwen3.8-max-free', apiKey: cleanEnv(process.env.TOKENROUTER_API_KEY) },
+    { model: 'deepseek/deepseek-v4-pro-0813-free', apiKey: cleanEnv(process.env.TOKENROUTER_API_KEY_2) }
+  ].filter(config => config.apiKey);
 
-  // 0. TokenRouter (OpenAI-compatible gateway, Qwen free tier)
-  if (TOKENROUTER_KEY) {
+  if (TOKENROUTER_CHAIN.length === 0) console.warn('[chat] no TOKENROUTER_API_KEY(_2) set, skipping TokenRouter');
+
+  for (const config of TOKENROUTER_CHAIN) {
     try {
       const trController = new AbortController();
       const trTimer = setTimeout(() => trController.abort(), 8000);
@@ -78,10 +82,10 @@ REGLAS DE RESPUESTA:
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${TOKENROUTER_KEY}`
+          'Authorization': `Bearer ${config.apiKey}`
         },
         body: JSON.stringify({
-          model: 'qwen/qwen3.8-max-free',
+          model: config.model,
           max_tokens: 512,
           temperature: 0.3,
           messages: [{ role: 'system', content: SYSTEM }, ...messages]
@@ -94,13 +98,13 @@ REGLAS DE RESPUESTA:
         const trData = await trRes.json();
         const reply = trData.choices?.[0]?.message?.content?.trim();
         if (reply) return res.status(200).json({ reply });
-        console.error('[chat] TokenRouter ok but no reply content', JSON.stringify(trData).slice(0, 500));
+        console.error('[chat] TokenRouter ok but no reply content', config.model, JSON.stringify(trData).slice(0, 500));
       } else {
         const errBody = await trRes.text().catch(() => '');
-        console.error('[chat] TokenRouter failed', trRes.status, errBody.slice(0, 500));
+        console.error('[chat] TokenRouter failed', config.model, trRes.status, errBody.slice(0, 500));
       }
     } catch (e) {
-      console.error('[chat] TokenRouter threw', e?.name, e?.message);
+      console.error('[chat] TokenRouter threw', config.model, e?.name, e?.message);
     }
   }
 
