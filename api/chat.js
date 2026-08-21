@@ -78,7 +78,7 @@ REGLAS DE RESPUESTA:
     try {
       const trController = new AbortController();
       const trTimer = setTimeout(() => trController.abort(), 8000);
-      const trRes = await fetch('https://tokenrouter.me/v1/chat/completions', {
+      const trRes = await fetch('https://api.tokenrouter.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
