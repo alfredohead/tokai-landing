@@ -66,48 +66,6 @@ REGLAS DE RESPUESTA:
 - Respuestas directas, claras y ágiles. Evitá bloques masivos de texto o explicaciones teóricas extensas.
 - Si el usuario es un Emisor o empresa con un proyecto real, recomendale ingresar a la [Plataforma TOKAI](https://tokairwa.com/platform.html) para completar la encuesta del Wizard de Emisión o contactar a tokairwa@gmail.com / Instagram @tokairwa.`;
 
-  // 0. TokenRouter (OpenAI-compatible gateway) — intenta cada modelo/key configurado en orden
-  const TOKENROUTER_CHAIN = [
-    { model: 'qwen/qwen3.8-max-free', apiKey: cleanEnv(process.env.TOKENROUTER_API_KEY) },
-    { model: 'deepseek/deepseek-v4-pro-0813-free', apiKey: cleanEnv(process.env.TOKENROUTER_API_KEY_2) }
-  ].filter(config => config.apiKey);
-
-  if (TOKENROUTER_CHAIN.length === 0) console.warn('[chat] no TOKENROUTER_API_KEY(_2) set, skipping TokenRouter');
-
-  for (const config of TOKENROUTER_CHAIN) {
-    try {
-      const trController = new AbortController();
-      const trTimer = setTimeout(() => trController.abort(), 15000);
-      const trRes = await fetch('https://api.tokenrouter.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.apiKey}`
-        },
-        body: JSON.stringify({
-          model: config.model,
-          max_tokens: 512,
-          temperature: 0.3,
-          messages: [{ role: 'system', content: SYSTEM }, ...messages]
-        }),
-        signal: trController.signal
-      });
-      clearTimeout(trTimer);
-
-      if (trRes.ok) {
-        const trData = await trRes.json();
-        const reply = trData.choices?.[0]?.message?.content?.trim();
-        if (reply) return res.status(200).json({ reply });
-        console.error('[chat] TokenRouter ok but no reply content', config.model, JSON.stringify(trData).slice(0, 500));
-      } else {
-        const errBody = await trRes.text().catch(() => '');
-        console.error('[chat] TokenRouter failed', config.model, trRes.status, errBody.slice(0, 500));
-      }
-    } catch (e) {
-      console.error('[chat] TokenRouter threw', config.model, e?.name, e?.message);
-    }
-  }
-
   const GROQ_KEY = cleanEnv(process.env.GROQ_API_KEY);
   if (!GROQ_KEY) console.warn('[chat] GROQ_API_KEY not set, skipping Groq');
 
