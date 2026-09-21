@@ -1639,10 +1639,17 @@ function InvestorOnboardingCard({project, wallet, toast}){
   var [qty,setQty] = useState(10);
   var [method,setMethod] = useState('usdc_polygon');
   var [reference,setReference] = useState('');
+  var [cuit,setCuit] = useState('');
+  var [cbuCvu,setCbuCvu] = useState('');
   var [order,setOrder] = useState(null);
   var priceUsd = (project.priceUsdCents||0)/100;
   var emailOk = /^[^@]+@[^@]+\.[^@]+$/.test(email.trim());
   var selMethod = PAYMENT_METHODS.find(function(m){ return m.id===method; }) || PAYMENT_METHODS[0];
+  // RG 1166/2026: transferencia y Mercado Pago exigen CUIT + CBU/CVU del titular
+  // para acreditar/rescatar fondos — cripto (usdc_polygon, ripio, lemon, binance) no.
+  var isBankMethod = method==='transferencia' || method==='mercadopago';
+  var cuitOk = /^\d{11}$/.test(cuit.replace(/\D/g,''));
+  var cbuCvuOk = /^\d{22}$/.test(cbuCvu.replace(/\D/g,''));
 
   function checkStatus(){
     if(!API||!emailOk) return;
@@ -1665,10 +1672,12 @@ function InvestorOnboardingCard({project, wallet, toast}){
   function subscribe(){
     if(!API||!emailOk){ toast&&toast({type:'err',title:'Email requerido',msg:'Ingresá un email válido.'}); return; }
     if(!(Number(qty)>0)){ toast&&toast({type:'err',title:'Cantidad inválida',msg:'Ingresá una cantidad mayor a cero.'}); return; }
+    if(isBankMethod && (!cuitOk||!cbuCvuOk)){ toast&&toast({type:'err',title:'Datos bancarios requeridos',msg:'Transferencia y Mercado Pago exigen CUIT y CBU/CVU del titular (RG 1166/2026).'}); return; }
     setBusy(true);
     var body = { projectId: project.id, email: email.trim().toLowerCase(), qty: Number(qty), method: method };
     if(walletAddr) body.wallet_address = walletAddr;
     if(reference.trim()) body.reference = reference.trim();
+    if(isBankMethod){ body.cuit = cuit.replace(/\D/g,''); body.cbu_cvu = cbuCvu.replace(/\D/g,''); }
     fetch(API+'/invest', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
       .then(function(r){ return r.ok?r.json():r.json().then(function(e){ return Promise.reject(e); }); })
       .then(function(d){ setOrder(d); toast&&toast({title:'Orden registrada',msg:d.message||'TOKAI confirmará tu fondeo.'}); })
@@ -1719,10 +1728,21 @@ function InvestorOnboardingCard({project, wallet, toast}){
             h('div',{},
               h('label',{style:{fontSize:11,color:'var(--txt-mute)',display:'block',marginBottom:4}},'Total estimado'),
               h('div',{style:Object.assign({},inp,{fontWeight:700,color:'var(--emerald)'})},priceUsd?'USD '+fmt(priceUsd*Number(qty||0)):'—'))),
+          isBankMethod&&h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}},
+            h('div',{},
+              h('label',{style:{fontSize:11,color:'var(--txt-mute)',display:'block',marginBottom:4}},'CUIT del titular *'),
+              h('input',{style:Object.assign({},inp,cuit&&!cuitOk?{borderColor:'#FF5C5C'}:{}),value:cuit,placeholder:'20-XXXXXXXX-X',
+                onChange:function(e){ setCuit(e.target.value); }})),
+            h('div',{},
+              h('label',{style:{fontSize:11,color:'var(--txt-mute)',display:'block',marginBottom:4}},'CBU / CVU del titular *'),
+              h('input',{style:Object.assign({},inp,cbuCvu&&!cbuCvuOk?{borderColor:'#FF5C5C'}:{}),value:cbuCvu,placeholder:'22 dígitos',
+                onChange:function(e){ setCbuCvu(e.target.value); }}))),
+          isBankMethod&&h('div',{style:{fontSize:10.5,color:'var(--txt-mute)',marginBottom:10,lineHeight:1.5}},
+            'Requerido por RG 1166/2026: los fondos solo pueden acreditarse desde una cuenta a la vista o CVU asociado a tu propio CUIT.'),
           h('div',{style:{marginBottom:12}},
             h('label',{style:{fontSize:11,color:'var(--txt-mute)',display:'block',marginBottom:4}},'Referencia / comprobante (opcional)'),
             h('input',{style:inp,value:reference,placeholder:'Hash de tx, ID de transferencia…',onChange:function(e){ setReference(e.target.value); }})),
-          h('button',{className:'btn btn-primary',style:{width:'100%'},disabled:busy||!emailOk,onClick:subscribe},
+          h('button',{className:'btn btn-primary',style:{width:'100%'},disabled:busy||!emailOk||(isBankMethod&&(!cuitOk||!cbuCvuOk)),onClick:subscribe},
             busy?'Enviando…':'② Registrar orden de suscripción →')));
 }
 
@@ -4568,7 +4588,7 @@ function HomeEmisor({chain, auth, go, wallet, connectWallet}){
 
 /* ── Catálogo de jurisdicciones para emisores multijurisdiccionales (v3.5.0) ── */
 const ISSUER_JURISDICTIONS = {
-  AR: { label:'🇦🇷 Argentina',       regimes:{ calificados:'CNV · RG 1088 — Oferta privada (calificados)', todos:'CNV · RG 1069 — Oferta pública' }, kycOptions:['sumsub','ripio','lemon'],     defaultKyc:'sumsub', iso:32,  compositeEmission:true },
+  AR: { label:'🇦🇷 Argentina',       regimes:{ calificados:'CNV · RG 1088 — Oferta privada (calificados)', todos:'CNV · RG 1069 — Oferta pública (Sandbox)', automatica:'CNV · RG 1159/2026 — Autorización Automática (Mediano Impacto Ampliado)' }, kycOptions:['sumsub','ripio','lemon'],     defaultKyc:'sumsub', iso:32,  compositeEmission:true },
   CL: { label:'🇨🇱 Chile',           regimes:{ calificados:'CMF · Ley Fintech — Inversionistas calificados', todos:'CMF · Ley Fintech — Oferta general' }, kycOptions:['sumsub','onfido','metamap'], defaultKyc:'sumsub', iso:152, compositeEmission:true },
   EU: { label:'🇪🇺 España / Europa', regimes:{ calificados:'MiCA · MiFID II — Inversores profesionales', todos:'MiCA · Retail — prospecto KIID requerido' }, kycOptions:['onfido','veriff','sumsub'],  defaultKyc:'onfido', iso:724, compositeEmission:true },
   US: { label:'🇺🇸 Estados Unidos',  regimes:{ calificados:'SEC · Reg D 506(c) — Accredited Investors', todos:'SEC · Reg S — Non-US Persons' }, kycOptions:['persona','veriff','sumsub'],   defaultKyc:'persona', iso:840, compositeEmission:true },
@@ -4584,6 +4604,15 @@ const ISSUER_JURISDICTIONS = {
    validación por el equipo legal/compliance interno de TOKAI antes de usarse como texto de
    disclosure vinculante. No reemplaza asesoría legal ni auditoría externa (ver Directiva
    Canónica de Auto-Auditoría Interna TOKAI en CLAUDE.md). */
+
+/* RG 1159/2026 + RG 1150/2026 (Argentina): Fideicomiso Financiero con Autorización
+   Automática de Mediano Impacto Ampliado — sin revisión previa de CNV, abierto a
+   inversores no calificados, tope de monto UVA 100.000.000 colocado en 12 meses.
+   El wizard no calcula el tope automáticamente (valuationUsd es el valor del activo
+   subyacente, no el monto de colocación de valores negociables, y no hay una fuente de
+   UVA en vivo integrada) — el emisor autodeclara que está dentro del tope y TOKAI lo
+   valida en la auditoría, igual que el resto de los checks regulatorios del wizard. */
+const RG1159_TOPE_UVA = 100000000;
 const KYC_PROVIDERS = {
   sumsub:  { label:'Sumsub',          flag:'🌍', desc:'Biometría + liveness global. Recomendado para LATAM.' },
   onfido:  { label:'Onfido',          flag:'🇪🇺', desc:'Líder europeo. Cumplimiento GDPR + MiCA.' },
@@ -4613,8 +4642,22 @@ function WizardCrear({chain, toast, go}){
     issuerJurisdiction: 'AR',
     kycProvider: 'sumsub',
     compositeEmission: false,
+    // v3.11.0 — AR + oferta pública: elegir vía RG 1159 (Autorización Automática) o RG 1069 (Sandbox clásico)
+    arRoute: null, arRouteAckTope: false, arRouteAckListado: false,
   });
   const set=(k,v)=>setF(s=>({...s,[k]:v}));
+  // Régimen aplicable: en AR + público general hay dos vías posibles (RG 1159 automática
+  // o RG 1069 clásica) que el emisor debe elegir explícitamente; el resto de jurisdicciones
+  // y audiencias derivan directo del catálogo.
+  function regimeFor(jurKey, audience, arRoute){
+    const jur = ISSUER_JURISDICTIONS[jurKey]||ISSUER_JURISDICTIONS['AR'];
+    if(jurKey==='AR' && audience==='todos'){
+      if(arRoute==='rg1159') return jur.regimes.automatica;
+      if(arRoute==='rg1069') return jur.regimes.todos;
+      return 'CNV · Elegí una vía de oferta pública (RG 1159 o RG 1069)';
+    }
+    return jur.regimes[audience]||jur.regimes['calificados'];
+  }
   function readFile(file,cb){ const r=new FileReader(); r.onload=()=>cb(r.result); r.readAsDataURL(file); }
 
   useEffect(function(){
@@ -4664,7 +4707,13 @@ function WizardCrear({chain, toast, go}){
     {t:'¿Qué querés tokenizar?', valid:()=>f.name.trim().length>2},
     {t:'¿Cuánto vale y en cuántas partes?', valid:()=>f.kind==='club'||(Number(f.valuationUsd)>0&&Number(f.tokens)>0)},
     {t:'Fotos del activo', valid:()=>true},
-    {t:'¿Quiénes pueden invertir?', valid:()=>true},
+    {t:'¿Quiénes pueden invertir?', valid:()=>{
+      if(f.issuerJurisdiction==='AR' && f.audience==='todos'){
+        if(!f.arRoute) return false;
+        if(f.arRoute==='rg1159' && !(f.arRouteAckTope && f.arRouteAckListado)) return false;
+      }
+      return true;
+    }},
     {t:'Revisar y crear', valid:()=>true},
   ];
   const s = steps[step];
@@ -4675,10 +4724,12 @@ function WizardCrear({chain, toast, go}){
     const strategy = (window.TOKEN_STRATEGIES||{})[f.tokenStandard] || (window.TOKEN_STRATEGIES||{})['ERC-3643'] || {};
     const soulbound = f.kind==='club' || !!strategy.soulbound;
     const jurCfg = (ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR']);
-    const regDerived = jurCfg.regimes[f.audience] || jurCfg.regimes['calificados'] || strategy.regime || 'Regimen regulado';
+    const regDerived = regimeFor(f.issuerJurisdiction, f.audience, f.arRoute) || strategy.regime || 'Regimen regulado';
     // isComposite = cualquier jurisdiccion en oferta publica con flag compositeEmission
-    // isRg1069   = especifico de Argentina (solo afecta naming y architecture key)
-    const isRg1069 = f.issuerJurisdiction === 'AR' && f.audience === 'todos';
+    // isRg1069/isRg1159 = especificos de Argentina + publico general (solo afecta naming,
+    // architecture key y trazabilidad — la eleccion de via la hace el emisor en el paso 4)
+    const isRg1069 = f.issuerJurisdiction === 'AR' && f.audience === 'todos' && f.arRoute === 'rg1069';
+    const isRg1159 = f.issuerJurisdiction === 'AR' && f.audience === 'todos' && f.arRoute === 'rg1159';
     const isComposite = !!f.compositeEmission;
     const emissionStack = isComposite ? [
       { stage: 1, key: isRg1069 ? 'pregat' : 'soulbound',
@@ -4703,8 +4754,8 @@ function WizardCrear({chain, toast, go}){
       supplyMax: f.kind==='club'? 500 : (Number(f.tokens)||0),
       priceUsd: f.kind==='club'? 0 : Math.round(price),
       coverImage:f.coverImage, gallery:f.gallery, photoSeals:f.photoSeals||[],
-      regime: (ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR']).regimes[f.audience] || strategy.regime || (f.audience==='todos' ? 'Oferta pública' : 'Oferta privada · calificados'),
-      regimeLabel: (ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR']).regimes[f.audience] || (f.audience==='todos' ? 'Oferta pública' : 'Oferta privada · calificados'),
+      regime: regDerived,
+      regimeLabel: regDerived,
       issuerJurisdiction: f.issuerJurisdiction || 'AR',
       kycProvider: f.kycProvider || 'sumsub',
       jurisdictions:[jurCfg.iso], lockupDays: f.audience==='todos'?0:180, soulbound, maxHolders: f.audience==='todos'?0:50,
@@ -4724,7 +4775,12 @@ function WizardCrear({chain, toast, go}){
         compliance: f.complianceAddress || '',
       },
       complianceRules: strategy.complianceRules || {},
-      meta: { emissionStack: emissionStack, emissionArchitecture: isRg1069 ? 'composite_1069_pregat_to_gat' : isComposite ? 'composite_local_soulbound_to_token' : 'single_instrument' },
+      meta: {
+        emissionStack: emissionStack,
+        emissionArchitecture: isRg1069 ? 'composite_1069_pregat_to_gat' : isComposite ? 'composite_local_soulbound_to_token' : 'single_instrument',
+        arRoute: (f.issuerJurisdiction === 'AR' && f.audience === 'todos') ? f.arRoute : null,
+        arRoute1159Ack: isRg1159 ? { topeUva: RG1159_TOPE_UVA, ackTope: !!f.arRouteAckTope, ackListado: !!f.arRouteAckListado } : null,
+      },
       phaseState: { phase: 1, phase2_active: false, emission_stack: emissionStack },
     };
     if(chain.createProject){ chain.createProject(cfg); toast&&toast({title:'¡Proyecto creado!',msg:f.name+' quedó listo para configurar y emitir.'}); go('admin'); }
@@ -4865,7 +4921,7 @@ function WizardCrear({chain, toast, go}){
                 boxShadow:sel?'0 6px 20px rgba(0,214,126,.07)':'none'}},
               h('div',{style:{fontWeight:700,fontSize:13,color:sel?'var(--emerald)':'var(--txt)'}},j.label),
               h('div',{style:{fontSize:10.5,color:'var(--txt-mute)',marginTop:3,lineHeight:1.3}},
-                j.regimes[f.audience]||j.regimes['calificados']));
+                regimeFor(k, f.audience, f.arRoute)));
           }))),
 
       /* ── Audiencia ── */
@@ -4880,10 +4936,35 @@ function WizardCrear({chain, toast, go}){
           h('div',{style:{fontWeight:700,fontSize:13.5,marginBottom:3,color:f.audience===k?'var(--emerald)':'var(--txt)'}},t),
           h('div',{style:{fontSize:12,color:'var(--txt-mute)',lineHeight:1.45}},d))),
 
+      /* ── Vía de oferta pública en Argentina: RG 1159 (Autorización Automática) vs RG 1069 (Sandbox clásico) ── */
+      f.issuerJurisdiction==='AR' && f.audience==='todos' && h('div',{style:{marginBottom:20}},
+        h('div',{style:{fontSize:13,fontWeight:700,color:'var(--txt)',marginBottom:10}},'Vía de oferta pública (Argentina) *'),
+        [
+          ['rg1159','Autorización Automática · RG 1159/2026','Sin revisión previa de CNV. Tope: UVA '+RG1159_TOPE_UVA.toLocaleString('es-AR')+' colocados en 12 meses. Igual exige listado en mercado autorizado y régimen informativo — solo evita la revisión previa.'],
+          ['rg1069','Oferta Pública clásica · RG 1069 (Sandbox)','Circuito con prospecto y revisión previa de CNV. Sin tope de monto.'],
+        ].map(function([k,t,d]){
+          const sel = f.arRoute===k;
+          return h('button',{key:k,onClick:function(){ set('arRoute',k); },
+            style:{display:'block',width:'100%',textAlign:'left',padding:'14px 16px',borderRadius:12,cursor:'pointer',marginBottom:8,transition:'all 0.2s',
+              border:'1.5px solid '+(sel?'var(--emerald)':'rgba(255,255,255,.05)'),
+              background:sel?'rgba(0,214,126,.04)':'rgba(255,255,255,.02)'}},
+            h('div',{style:{fontWeight:700,fontSize:13,marginBottom:3,color:sel?'var(--emerald)':'var(--txt)'}},t),
+            h('div',{style:{fontSize:11.5,color:'var(--txt-mute)',lineHeight:1.4}},d));
+        }),
+        f.arRoute==='rg1159' && h('div',{style:{padding:'12px 14px',borderRadius:10,background:'rgba(255,178,62,.06)',border:'1px solid rgba(255,178,62,.18)',marginTop:6}},
+          h('div',{style:{fontSize:11.5,color:'var(--txt-dim)',marginBottom:8,fontWeight:700}},'Autodeclaración requerida (TOKAI la valida en la auditoría)'),
+          h('label',{style:{display:'flex',gap:8,alignItems:'flex-start',fontSize:11.5,color:'var(--txt-dim)',marginBottom:8,cursor:'pointer'}},
+            h('input',{type:'checkbox',checked:f.arRouteAckTope,onChange:function(e){ set('arRouteAckTope',e.target.checked); },style:{marginTop:2}}),
+            h('span',{},'El monto total de valores a colocar por este emisor en los últimos 12 meses no supera el equivalente a UVA '+RG1159_TOPE_UVA.toLocaleString('es-AR')+'.')),
+          h('label',{style:{display:'flex',gap:8,alignItems:'flex-start',fontSize:11.5,color:'var(--txt-dim)',cursor:'pointer'}},
+            h('input',{type:'checkbox',checked:f.arRouteAckListado,onChange:function(e){ set('arRouteAckListado',e.target.checked); },style:{marginTop:2}}),
+            h('span',{},'Voy a listar los valores en un mercado autorizado y a cumplir el régimen informativo general de Fideicomisos Financieros.'))),
+        !f.arRoute && h('div',{style:{fontSize:11,color:'#FFB23E',marginTop:4}},'Elegí una vía para continuar.')),
+
       /* ── Régimen derivado (read-only) ── */
       (function(){
         const jur = ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR'];
-        const regDerived = jur.regimes[f.audience]||jur.regimes['calificados'];
+        const regDerived = regimeFor(f.issuerJurisdiction, f.audience, f.arRoute);
         return h('div',{style:{padding:'10px 14px',borderRadius:10,background:'rgba(0,214,126,.04)',border:'1px solid rgba(0,214,126,.1)',marginBottom:16,fontSize:12}},
           h('div',{style:{fontWeight:700,marginBottom:4,color:'var(--emerald)'}},'Régimen aplicable'),
           h('div',{style:{fontFamily:'var(--mono)',fontSize:11.5,color:'var(--txt)'}},regDerived),
@@ -4937,9 +5018,8 @@ function WizardCrear({chain, toast, go}){
         const _jur2 = ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR'];
         const _isAR = f.issuerJurisdiction === 'AR';
         const _sym = (f.name.replace(/[^A-Za-z]/g,'').slice(0,4).toUpperCase())||'TKN';
-        const _archTitle = _isAR
-          ? 'Arquitectura de emisión compuesta · RG 1069'
-          : 'Arquitectura de emisión compuesta · ' + _jur2.label;
+        const _arLabel = f.audience==='todos' ? (f.arRoute==='rg1159' ? 'RG 1159/2026' : 'RG 1069') : 'RG 1088';
+        const _archTitle = 'Arquitectura de emisión compuesta · ' + (_isAR ? _arLabel : _jur2.label);
         const _stage2Desc = _isAR
           ? 'Token definitivo ERC-3643 bajo TokenFactory TOKAI. El canje quema el certificado soulbound.'
           : 'Token definitivo regulado bajo la normativa de ' + _jur2.label + '. El canje quema el certificado soulbound.';
@@ -4958,7 +5038,7 @@ function WizardCrear({chain, toast, go}){
         adv?'Ocultar detalle técnico':'Ver detalle técnico'),
       adv && h('div',{className:'card',style:{marginTop:10,fontSize:12,color:'var(--txt-dim)',lineHeight:1.6}},
         h('div',{style:{fontFamily:'var(--mono)',fontSize:11.5}},
-          'Régimen: '+((ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR']).regimes[f.audience]||'—'),h('br'),
+          'Régimen: '+(regimeFor(f.issuerJurisdiction, f.audience, f.arRoute)||'—'),h('br'),
           'Jurisdicción: '+(ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR']).label+' (ISO '+(ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR']).iso+')',h('br'),
           'KYC Provider: '+((KYC_PROVIDERS[f.kycProvider]||{}).label||f.kycProvider),h('br'),
           'Lock-up: '+(f.audience==='todos'?'0 días':'180 días'),h('br'),
@@ -5054,7 +5134,7 @@ function WizardCrear({chain, toast, go}){
             h('div', { style: { textAlign: 'right' } },
               h('div', { style: { color: 'var(--txt-mute)', fontSize: 8, textTransform: 'uppercase', marginBottom: 2 } }, 'Regulación'),
               h('div', { style: { fontWeight: 700, color: 'var(--emerald)' } },
-                (ISSUER_JURISDICTIONS[f.issuerJurisdiction]||ISSUER_JURISDICTIONS['AR']).regimes[f.audience]||(f.audience==='todos'?'Oferta pública':'Oferta privada'))))
+                regimeFor(f.issuerJurisdiction, f.audience, f.arRoute)||(f.audience==='todos'?'Oferta pública':'Oferta privada'))))
         ))
     ),
 
@@ -7639,7 +7719,8 @@ var PROJECT_TYPES = [
 var REGIMES = [
   'No sé todavía — TOKAI me ayuda a decidir',
   'RG 1088 — Oferta privada (inversores calificados, ARG)',
-  'RG 1069 — Oferta pública (Sandbox CNV)',
+  'RG 1159/2026 — Autorización Automática, oferta pública (ARG)',
+  'RG 1069 — Oferta pública (Sandbox CNV, ARG)',
   'Reg D — Colocación privada USA',
   'MiCA — Unión Europea',
   'Multijurisdiccional',
@@ -7815,16 +7896,28 @@ function PaymentDetail({ method, onConfirm, toast }) {
   var [saving, setSaving] = useState(false);
   var [done, setDone]   = useState(false);
   var [copied, setCopied] = useState(false);
+  var [cuit, setCuit]     = useState('');
+  var [cbuCvu, setCbuCvu] = useState('');
+  // RG 1166/2026: transferencia bancaria exige CUIT + CBU/CVU propios para
+  // que TOKAI pueda acreditar titularidad del fondeo.
+  var isBankMethod = m.id === 'transferencia';
+  var cuitOk    = /^\d{11}$/.test(cuit.replace(/\D/g,''));
+  var cbuCvuOk  = /^\d{22}$/.test(cbuCvu.replace(/\D/g,''));
 
   function copy(t) { navigator.clipboard && navigator.clipboard.writeText(t); setCopied(true); setTimeout(function(){ setCopied(false); }, 1800); }
 
   async function confirm() {
+    if (isBankMethod && (!cuitOk || !cbuCvuOk)) {
+      toast && toast({ type: 'err', title: 'Datos bancarios requeridos', msg: 'Transferencia exige CUIT y CBU/CVU del titular (RG 1166/2026).' });
+      return;
+    }
     setSaving(true);
     var API = window.__API_URL__ || '';
     if (API) {
       try {
         var body = { method: m.id };
         if (tx && tx.trim()) body.reference = tx.trim();
+        if (isBankMethod) { body.cuit = cuit.replace(/\D/g,''); body.cbu_cvu = cbuCvu.replace(/\D/g,''); }
         var res = await fetch(API + '/payments', {
           method: 'POST', credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -7886,11 +7979,21 @@ function PaymentDetail({ method, onConfirm, toast }) {
           h('button', { onClick: function(){ copy(kv[1]); }, style: { background: 'none', border: 'none', color: 'var(--txt-mute)', cursor: 'pointer', fontSize: 10 } }, '📋'));
       })),
     m.id === 'mercadopago' && h('a', { href: m.ctaUrl, target: '_blank', style: { display: 'block', padding: '12px', borderRadius: 9, background: m.color, color: '#fff', fontWeight: 700, fontSize: 14, textAlign: 'center', textDecoration: 'none', marginBottom: 10 } }, m.cta),
+    isBankMethod && h('div', { style: { marginBottom: 10 } },
+      h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 5 } },
+        h('div', {},
+          h('label', { style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Tu CUIT *'),
+          h('input', { style: Object.assign({}, inp, cuit && !cuitOk ? { borderColor: '#FF5C5C' } : {}), value: cuit, placeholder: '20-XXXXXXXX-X', onChange: function(e){ setCuit(e.target.value); } })),
+        h('div', {},
+          h('label', { style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 4 } }, 'Tu CBU / CVU *'),
+          h('input', { style: Object.assign({}, inp, cbuCvu && !cbuCvuOk ? { borderColor: '#FF5C5C' } : {}), value: cbuCvu, placeholder: '22 dígitos', onChange: function(e){ setCbuCvu(e.target.value); } }))),
+      h('div', { style: { fontSize: 10.5, color: 'var(--txt-mute)', lineHeight: 1.5 } },
+        'Requerido por RG 1166/2026: TOKAI solo puede acreditar transferencias desde una cuenta a la vista o CVU asociado a tu propio CUIT.')),
     m.fields && m.fields.length > 0 && h('div', { style: { marginTop: 12 } },
       h('label', { style: { fontSize: 11, color: 'var(--txt-mute)', display: 'block', marginBottom: 5 } },
         m.id === 'usdc_polygon' ? 'Hash de la transacción (0x…)' : 'ID / número de comprobante'),
       h('input', { style: inp, value: tx, placeholder: m.id === 'usdc_polygon' ? '0x...' : 'ID-123456', onChange: function(e){ setTx(e.target.value); } })),
-    m.id !== 'mercadopago' && h('button', { className: 'btn btn-primary', style: { width: '100%', marginTop: 12, background: m.color, borderColor: m.color }, onClick: confirm, disabled: saving || (m.fields && m.fields.length > 0 && !tx.trim()) },
+    m.id !== 'mercadopago' && h('button', { className: 'btn btn-primary', style: { width: '100%', marginTop: 12, background: m.color, borderColor: m.color }, onClick: confirm, disabled: saving || (m.fields && m.fields.length > 0 && !tx.trim()) || (isBankMethod && (!cuitOk || !cbuCvuOk)) },
       saving ? 'Verificando...' : m.auto ? '✓ Verificar pago' : '✓ Notificar pago a TOKAI'));
 }
 
