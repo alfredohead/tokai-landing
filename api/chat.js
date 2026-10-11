@@ -61,9 +61,51 @@ async function submitLead(lead, messages) {
   }
 }
 
+
+// Extracción determinística: no depende de que el modelo emita el marcador (puede cortarse por max_tokens).
+const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+const PHONE_RE = /(?:\+?\d[\d\s().-]{7,}\d)/;
+const YES_RE = /(^|[^\p{L}])(sí|si|de acuerdo|acepto|ok|dale|claro|por supuesto|perfecto|está bien|esta bien)(?![\p{L}])/iu;
+
+function deterministicLead(messages) {
+  const idx = messages.findIndex(m => m.role === 'assistant' && String(m.content).includes('Usaremos estos datos'));
+  if (idx === -1) return null;
+  const after = messages.slice(idx + 1).filter(m => m.role === 'user').map(m => String(m.content));
+  if (after.length === 0 || !YES_RE.test(after[0])) return null;      // debe haber aceptado explícitamente
+  const text = after.join(' ');
+  const email = (text.match(EMAIL_RE) || [null])[0];
+  const phoneRaw = (text.replace(EMAIL_RE, ' ').match(PHONE_RE) || [null])[0];
+  const phone = phoneRaw ? phoneRaw.trim() : null;
+  if (!email && !phone) return null;
+  const all = messages.filter(m => m.role === 'user').map(m => String(m.content)).join(' ');
+  const nameMatch = text.match(/(?:[Ss]oy|[Mm]e llamo|[Mm]i nombre es)\s+([A-ZÁÉÍÓÚÑ][\wáéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][\wáéíóúñ]+){0,2})/);
+  const bigValue = /millon|millón|\bUSD?\s*\d{3}[.,]?\d{3}|u\$s\s*\d/i.test(all);
+  const soon = /\b([1-9]|1[0-2])\s*mes/i.test(all) || /urgent|inmediat|este año/i.test(all);
+  const assetish = /inmueble|edificio|desarroll|campo|tierra|flota|veh[ií]culo|proyecto|oficina|lote|energ|miner/i.test(all);
+  const score = bigValue && soon && assetish ? 'A' : (assetish ? 'B' : 'C');
+  return {
+    name: nameMatch ? nameMatch[1].trim() : null, email, phone,
+    assetType: null, assetValue: null, timeline: null,
+    notes: all.slice(0, 1400), score, consent: true,
+  };
+}
+
 async function sendReply(res, reply, messages) {
   const { visible, lead } = extractLead(reply);
-  await submitLead(lead, messages);
+  const base = deterministicLead(messages);
+  let merged = null;
+  if (lead && base) {
+    const keep = (a, b) => (typeof a === 'string' && a.trim() ? a : b);
+    merged = {
+      name: keep(lead.name, base.name), email: keep(lead.email, base.email), phone: keep(lead.phone, base.phone),
+      assetType: keep(lead.assetType, base.assetType), assetValue: keep(lead.assetValue, base.assetValue),
+      timeline: keep(lead.timeline, base.timeline), notes: keep(lead.notes, base.notes),
+      score: ['A', 'B', 'C'].includes(lead.score) ? lead.score : base.score, consent: true,
+    };
+  } else {
+    merged = base;   // sin marcador válido, usa la extracción determinística
+  }
+  await submitLead(merged, messages);
   return res.status(200).json({ reply: visible || reply });
 }
 
