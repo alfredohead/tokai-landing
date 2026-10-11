@@ -20,6 +20,53 @@ function deepSeekModel() {
     : model;
 }
 
+
+// ---- Captación de leads (calificador) ----
+const CONSENT_NOTICE = 'Usaremos estos datos solo para contactarte por tu consulta. ¿Estás de acuerdo?';
+const LEAD_RE = /\[\[LEAD:(\{[\s\S]*?\})\]\]/;
+
+function extractLead(reply) {
+  const m = reply.match(LEAD_RE);
+  const visible = reply.replace(/\[\[LEAD:[\s\S]*?\]\]/g, '').trim();
+  if (!m) return { visible, lead: null };
+  try { return { visible, lead: JSON.parse(m[1]) }; } catch { return { visible, lead: null }; }
+}
+
+async function submitLead(lead, messages) {
+  const url = cleanEnv(process.env.CM_LEADS_URL);
+  const secret = cleanEnv(process.env.LEAD_INGEST_SECRET);
+  if (!url || !secret || !lead) return;
+  // El aviso de uso de datos debe haber sido mostrado por el asistente antes de captar el contacto.
+  const noticeShown = messages.some(m => m.role === 'assistant' && String(m.content).includes('Usaremos estos datos'));
+  if (!noticeShown) return;
+  const str = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : null);
+  const body = {
+    name: str(lead.name, 160), email: str(lead.email, 200), phone: str(lead.phone, 60),
+    assetType: str(lead.assetType, 120), assetValue: str(lead.assetValue, 120), timeline: str(lead.timeline, 120),
+    notes: str(lead.notes, 1500), score: ['A', 'B', 'C'].includes(lead.score) ? lead.score : 'C',
+    consent: lead.consent === true,
+  };
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 6000);
+    const r = await fetch(url, {
+      method: 'POST', signal: ctl.signal,
+      headers: { 'Content-Type': 'application/json', 'x-lead-secret': secret },
+      body: JSON.stringify(body)
+    });
+    clearTimeout(t);
+    if (!r.ok) console.error('[chat] lead rechazado', r.status);
+  } catch (e) {
+    console.error('[chat] lead error', e?.name, e?.message);
+  }
+}
+
+async function sendReply(res, reply, messages) {
+  const { visible, lead } = extractLead(reply);
+  await submitLead(lead, messages);
+  return res.status(200).json({ reply: visible || reply });
+}
+
 export default async function handler(req, res) {
   // CORS universal para la API pública de la landing
   const origin = req.headers.origin || '';
@@ -64,7 +111,15 @@ Tu función es:
 
 REGLAS DE RESPUESTA:
 - Respuestas directas, claras y ágiles. Evitá bloques masivos de texto o explicaciones teóricas extensas.
-- Si el usuario es un Emisor o empresa con un proyecto real, recomendale ingresar a la [Plataforma TOKAI](https://tokairwa.com/platform.html) para completar la encuesta del Wizard de Emisión o contactar a tokairwa@gmail.com / Instagram @tokairwa.`;
+- Si el usuario es un Emisor o empresa con un proyecto real, recomendale ingresar a la [Plataforma TOKAI](https://tokairwa.com/platform.html) para completar la encuesta del Wizard de Emisión o contactar a tokairwa@gmail.com / Instagram @tokairwa.
+
+CALIFICACIÓN DE EMISORES (captación de contactos):
+- Si la persona es dueña o desarrolladora de un activo y muestra interés, hacé UNA pregunta por mensaje, de forma natural: 1) qué tipo de activo es, 2) valor aproximado, 3) en qué plazo necesita financiamiento o liquidez.
+- Luego ofrecé que el equipo la contacte y pedí nombre y un mail o WhatsApp. ANTES de pedir los datos de contacto, mostrá exactamente esta frase: "Usaremos estos datos solo para contactarte por tu consulta. ¿Estás de acuerdo?" y esperá su respuesta afirmativa.
+- Solo si la persona aceptó y dio un medio de contacto, agregá AL FINAL de tu respuesta, en una línea aparte, este marcador con JSON válido (sin texto después): [[LEAD:{"name":"","email":"","phone":"","assetType":"","assetValue":"","timeline":"","notes":"resumen breve de lo que busca","score":"A","consent":true}]]
+- score: A = activo de alto valor (por ejemplo inmueble o proyecto) con necesidad en menos de 12 meses; B = interés claro pero plazo o valor poco definido; C = consulta general o estudiante.
+- Nunca prometas rendimientos ni retornos, nunca hables de ofertas de inversión concretas, y aclará que tu información es orientativa y no constituye recomendación de inversión.
+- No muestres el marcador [[LEAD...]] en el texto que ves como explicación: solo va como última línea cuando corresponde.`;
 
   // 0. TokenRouter (OpenAI-compatible gateway) — intenta cada modelo/key configurado en orden
   const TOKENROUTER_CHAIN = [
@@ -97,7 +152,7 @@ REGLAS DE RESPUESTA:
       if (trRes.ok) {
         const trData = await trRes.json();
         const reply = trData.choices?.[0]?.message?.content?.trim();
-        if (reply) return res.status(200).json({ reply });
+        if (reply) return sendReply(res, reply, messages);
         console.error('[chat] TokenRouter ok but no reply content', config.model, JSON.stringify(trData).slice(0, 500));
       } else {
         const errBody = await trRes.text().catch(() => '');
@@ -135,7 +190,7 @@ REGLAS DE RESPUESTA:
       if (groqRes.ok) {
         const groqData = await groqRes.json();
         const reply = groqData.choices?.[0]?.message?.content?.trim();
-        if (reply) return res.status(200).json({ reply });
+        if (reply) return sendReply(res, reply, messages);
         console.error('[chat] Groq ok but no reply content', JSON.stringify(groqData).slice(0, 500));
       } else {
         const errBody = await groqRes.text().catch(() => '');
@@ -160,7 +215,7 @@ REGLAS DE RESPUESTA:
     const bkText = await bkRes.text();
     const bkData = (() => { try { return JSON.parse(bkText); } catch { return {}; } })();
     if (bkRes.ok && bkData.reply) {
-      return res.status(200).json({ reply: bkData.reply });
+      return sendReply(res, String(bkData.reply), messages);
     }
     console.error('[chat] Fly.io backend failed', bkRes.status, bkText.slice(0, 500));
   } catch (e) {
@@ -208,7 +263,7 @@ REGLAS DE RESPUESTA:
         const data = await response.json();
         const msgObj = data.choices?.[0]?.message;
         const reply = msgObj?.content?.trim();
-        if (reply) return res.status(200).json({ reply });
+        if (reply) return sendReply(res, reply, messages);
         console.error('[chat] NVIDIA ok but no reply content', config.model);
       } else {
         const errBody = await response.text().catch(() => '');
