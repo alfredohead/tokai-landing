@@ -32,7 +32,28 @@ function extractLead(reply) {
   try { return { visible, lead: JSON.parse(m[1]) }; } catch { return { visible, lead: null }; }
 }
 
-async function submitLead(lead, messages) {
+// Atribución de origen (UTM + referrer) enviada por el widget del sitio junto a 'messages'.
+// No forma parte del contrato previo con CM: se agrega como campo adicional y, para que
+// llegue aunque CM ignore el campo nuevo, también se antepone a 'notes'.
+function sanitizeOrigin(o) {
+  if (!o || typeof o !== 'object') return null;
+  const clip = (v) => (typeof v === 'string' ? v.trim().slice(0, 80) : '');
+  return {
+    utm_source: clip(o.utm_source), utm_medium: clip(o.utm_medium),
+    utm_campaign: clip(o.utm_campaign), referrer: clip(o.referrer),
+  };
+}
+
+function formatOrigin(o) {
+  if (!o) return '';
+  const part = (v) => v || '-';
+  const utmPart = `${part(o.utm_source)}/${part(o.utm_medium)}/${part(o.utm_campaign)}`;
+  const ref = part(o.referrer);
+  if (utmPart === '-/-/-' && ref === '-') return ''; // sin UTM ni referrer: nada que reportar
+  return `${utmPart} | ${ref}`;
+}
+
+async function submitLead(lead, messages, origin) {
   const url = cleanEnv(process.env.CM_LEADS_URL);
   const secret = cleanEnv(process.env.LEAD_INGEST_SECRET);
   if (!url || !secret || !lead) return;
@@ -40,11 +61,14 @@ async function submitLead(lead, messages) {
   const noticeShown = messages.some(m => m.role === 'assistant' && String(m.content).includes('Usaremos estos datos'));
   if (!noticeShown) return;
   const str = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : null);
+  const originStr = formatOrigin(origin);
+  let notes = str(lead.notes, 1500);
+  if (originStr) notes = `[origen: ${originStr}] ${notes || ''}`.trim().slice(0, 1500);
   const body = {
     name: str(lead.name, 160), email: str(lead.email, 200), phone: str(lead.phone, 60),
     assetType: str(lead.assetType, 120), assetValue: str(lead.assetValue, 120), timeline: str(lead.timeline, 120),
-    notes: str(lead.notes, 1500), score: ['A', 'B', 'C'].includes(lead.score) ? lead.score : 'C',
-    consent: lead.consent === true,
+    notes, score: ['A', 'B', 'C'].includes(lead.score) ? lead.score : 'C',
+    consent: lead.consent === true, origin: originStr || null,
   };
   try {
     const ctl = new AbortController();
@@ -90,7 +114,7 @@ function deterministicLead(messages) {
   };
 }
 
-async function sendReply(res, reply, messages) {
+async function sendReply(res, reply, messages, origin) {
   const { visible, lead } = extractLead(reply);
   const base = deterministicLead(messages);
   let merged = null;
@@ -105,7 +129,7 @@ async function sendReply(res, reply, messages) {
   } else {
     merged = base;   // sin marcador válido, usa la extracción determinística
   }
-  await submitLead(merged, messages);
+  await submitLead(merged, messages, origin);
   return res.status(200).json({ reply: visible || reply });
 }
 
@@ -140,6 +164,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Mensaje inválido' });
     }
   }
+  const leadOrigin = sanitizeOrigin(req.body?.origin);
 
   const SYSTEM = `Sos el asistente interactivo de TOKAI RWA, un laboratorio especializado en diseñar, estructurar y ejecutar proyectos de tokenización de activos reales (RWA) en Argentina y LATAM.
 
@@ -157,8 +182,9 @@ REGLAS DE RESPUESTA:
 
 CALIFICACIÓN DE EMISORES (captación de contactos):
 - Si la persona es dueña o desarrolladora de un activo y muestra interés, hacé UNA pregunta por mensaje, de forma natural: 1) qué tipo de activo es, 2) valor aproximado, 3) en qué plazo necesita financiamiento o liquidez.
+- Antes de pedir el consentimiento y los datos de contacto, preguntá UNA sola vez y de forma breve: "Por cierto, ¿cómo nos conociste?" (ej. LinkedIn, Instagram, buscador, recomendación). Si no responde o cambia de tema, no insistas y seguí sin ese dato.
 - Luego ofrecé que el equipo la contacte y pedí nombre y un mail o WhatsApp. ANTES de pedir los datos de contacto, mostrá exactamente esta frase: "Usaremos estos datos solo para contactarte por tu consulta. ¿Estás de acuerdo?" y esperá su respuesta afirmativa.
-- Solo si la persona aceptó y dio un medio de contacto, agregá AL FINAL de tu respuesta, en una línea aparte, este marcador con JSON válido (sin texto después): [[LEAD:{"name":"","email":"","phone":"","assetType":"","assetValue":"","timeline":"","notes":"resumen breve de lo que busca","score":"A","consent":true}]]
+- Solo si la persona aceptó y dio un medio de contacto, agregá AL FINAL de tu respuesta, en una línea aparte, este marcador con JSON válido (sin texto después): [[LEAD:{"name":"","email":"","phone":"","assetType":"","assetValue":"","timeline":"","notes":"si respondió cómo te conoció, empezá con [conocio: <respuesta breve>] seguido de un resumen breve de lo que busca; si no respondió, solo el resumen breve","score":"A","consent":true}]]
 - score: A = activo de alto valor (por ejemplo inmueble o proyecto) con necesidad en menos de 12 meses; B = interés claro pero plazo o valor poco definido; C = consulta general o estudiante.
 - Nunca prometas rendimientos ni retornos, nunca hables de ofertas de inversión concretas, y aclará que tu información es orientativa y no constituye recomendación de inversión.
 - No muestres el marcador [[LEAD...]] en el texto que ves como explicación: solo va como última línea cuando corresponde.`;
@@ -194,7 +220,7 @@ CALIFICACIÓN DE EMISORES (captación de contactos):
       if (trRes.ok) {
         const trData = await trRes.json();
         const reply = trData.choices?.[0]?.message?.content?.trim();
-        if (reply) return sendReply(res, reply, messages);
+        if (reply) return sendReply(res, reply, messages, leadOrigin);
         console.error('[chat] TokenRouter ok but no reply content', config.model, JSON.stringify(trData).slice(0, 500));
       } else {
         const errBody = await trRes.text().catch(() => '');
@@ -232,7 +258,7 @@ CALIFICACIÓN DE EMISORES (captación de contactos):
       if (groqRes.ok) {
         const groqData = await groqRes.json();
         const reply = groqData.choices?.[0]?.message?.content?.trim();
-        if (reply) return sendReply(res, reply, messages);
+        if (reply) return sendReply(res, reply, messages, leadOrigin);
         console.error('[chat] Groq ok but no reply content', JSON.stringify(groqData).slice(0, 500));
       } else {
         const errBody = await groqRes.text().catch(() => '');
@@ -257,7 +283,7 @@ CALIFICACIÓN DE EMISORES (captación de contactos):
     const bkText = await bkRes.text();
     const bkData = (() => { try { return JSON.parse(bkText); } catch { return {}; } })();
     if (bkRes.ok && bkData.reply) {
-      return sendReply(res, String(bkData.reply), messages);
+      return sendReply(res, String(bkData.reply), messages, leadOrigin);
     }
     console.error('[chat] Fly.io backend failed', bkRes.status, bkText.slice(0, 500));
   } catch (e) {
@@ -305,7 +331,7 @@ CALIFICACIÓN DE EMISORES (captación de contactos):
         const data = await response.json();
         const msgObj = data.choices?.[0]?.message;
         const reply = msgObj?.content?.trim();
-        if (reply) return sendReply(res, reply, messages);
+        if (reply) return sendReply(res, reply, messages, leadOrigin);
         console.error('[chat] NVIDIA ok but no reply content', config.model);
       } else {
         const errBody = await response.text().catch(() => '');
@@ -320,3 +346,6 @@ CALIFICACIÓN DE EMISORES (captación de contactos):
   console.error('[chat] all providers exhausted, returning 500');
   return res.status(500).json({ error: 'Servicio de consulta ocupado momentáneamente. Por favor intentá de nuevo.' });
 }
+
+// Exports con nombre para test local (no afectan a Vercel, que usa el default export).
+export { sanitizeOrigin, formatOrigin, extractLead, deterministicLead };
