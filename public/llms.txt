@@ -35,6 +35,7 @@ TOKAI RWA designs, evaluates and structures real-world asset tokenization projec
 ## Important Public Pages
 
 - Homepage: https://tokairwa.com/
+- Free 20-minute asset diagnostic (issuer intake form): https://tokairwa.com/diagnostico/
 - Guide library: https://tokairwa.com/guias/
 - Real-world asset tokenization: https://tokairwa.com/tokenizacion-activos-reales/
 - RWA in Argentina: https://tokairwa.com/rwa-argentina/

@@ -53,22 +53,28 @@ function formatOrigin(o) {
   return `${utmPart} | ${ref}`;
 }
 
-async function submitLead(lead, messages, origin) {
+// Envía al endpoint de ingesta de CM un lead ya validado.
+// Compartido con api/diagnostico.js: mismo contrato, mismas variables de entorno
+// (CM_LEADS_URL + LEAD_INGEST_SECRET). Sin claves en el código.
+// originStr se antepone a 'notes' porque CM fija source='chatbot' en la ingesta
+// y su esquema descarta campos extra: así el origen llega aunque no sea un campo propio.
+// 'tag' (opcional) etiqueta la fuente del lead, p. ej. 'diagnostico'.
+export async function postLeadToCM(lead, originStr, tag) {
   const url = cleanEnv(process.env.CM_LEADS_URL);
   const secret = cleanEnv(process.env.LEAD_INGEST_SECRET);
-  if (!url || !secret || !lead) return;
-  // El aviso de uso de datos debe haber sido mostrado por el asistente antes de captar el contacto.
-  const noticeShown = messages.some(m => m.role === 'assistant' && String(m.content).includes('Usaremos estos datos'));
-  if (!noticeShown) return;
+  if (!url || !secret || !lead) return false;
   const str = (v, n) => (typeof v === 'string' ? v.trim().slice(0, n) : null);
-  const originStr = formatOrigin(origin);
   let notes = str(lead.notes, 1500);
-  if (originStr) notes = `[origen: ${originStr}] ${notes || ''}`.trim().slice(0, 1500);
+  const marker = tag
+    ? `[origen: ${tag}]${originStr ? ' ' + originStr : ''}`
+    : (originStr ? `[origen: ${originStr}]` : '');
+  if (marker) notes = `${marker} ${notes || ''}`.trim().slice(0, 1500);
   const body = {
     name: str(lead.name, 160), email: str(lead.email, 200), phone: str(lead.phone, 60),
     assetType: str(lead.assetType, 120), assetValue: str(lead.assetValue, 120), timeline: str(lead.timeline, 120),
     notes, score: ['A', 'B', 'C'].includes(lead.score) ? lead.score : 'C',
-    consent: lead.consent === true, origin: originStr || null,
+    consent: lead.consent === true,
+    origin: originStr ? (tag ? `${tag} | ${originStr}` : originStr) : (tag || null),
   };
   try {
     const ctl = new AbortController();
@@ -79,10 +85,19 @@ async function submitLead(lead, messages, origin) {
       body: JSON.stringify(body)
     });
     clearTimeout(t);
-    if (!r.ok) console.error('[chat] lead rechazado', r.status);
+    if (!r.ok) { console.error('[lead] rechazado', r.status); return false; }
+    return true;
   } catch (e) {
-    console.error('[chat] lead error', e?.name, e?.message);
+    console.error('[lead] error', e?.name, e?.message);
+    return false;
   }
+}
+
+async function submitLead(lead, messages, origin) {
+  // El aviso de uso de datos debe haber sido mostrado por el asistente antes de captar el contacto.
+  const noticeShown = messages.some(m => m.role === 'assistant' && String(m.content).includes('Usaremos estos datos'));
+  if (!noticeShown) return;
+  await postLeadToCM(lead, formatOrigin(origin));
 }
 
 

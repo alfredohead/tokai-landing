@@ -121,6 +121,12 @@
     <priority>0.70</priority>
   </url>
   <url>
+    <loc>https://tokairwa.com/diagnostico/</loc>
+    <lastmod>2026-10-14</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.90</priority>
+  </url>
+  <url>
     <loc>https://tokairwa.com/privacidad/</loc>
     <lastmod>2026-10-11</lastmod>
     <changefreq>yearly</changefreq>
