@@ -2,6 +2,13 @@
 
 Leer antes `EXECUTOR_POLICY.md`. Cada sesión material agrega una entrada: intent, archivos, estado de deploy (DEPLOYED / COMMITTED-NOT-DEPLOYED / LOCAL-ONLY), executor usado, próximos pasos.
 
+## 2026-10-27 - Corrección de estado: commit de continuidad
+- Intent: registrar que el commit 0e8fbcd "chore: enforce executor continuity controls" dejó las políticas de continuidad de executor en estado COMMITTED-NOT-DEPLOYED. Corrige solo el estado de la entrada previa "Addendum de roles y autorizaciones" (LOCAL-ONLY → COMMITTED-NOT-DEPLOYED); la entrada previa no se edita.
+- Files: .context/agent_sync.md (nueva entrada). Sin otros archivos.
+- Registro: repo tokai-landing; rama main; base/HEAD 0e8fbcd; worker Claude Code (Opus 5.5); revisor ninguno; estado COMMITTED-NOT-DEPLOYED; deploy_autorizado=false.
+- Deploy: COMMITTED-NOT-DEPLOYED (0e8fbcd sin push ni deploy).
+- Next: push/deploy sólo con OK textual de Alfredo.
+
 ## 2026-10-27 - Addendum de roles y autorizaciones
 - Intent: agregar Addendum 2026-10-27 a EXECUTOR_POLICY.md (Hermes router, Claude Code único worker, Codex sólo revisión read-only autorizada, gates de OK textual de Alfredo).
 - Files: .context/EXECUTOR_POLICY.md (append), .context/agent_sync.md (append). Sin otros archivos.
