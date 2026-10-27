@@ -17,3 +17,13 @@
 
 ## Overrides
 (ninguno)
+
+## Addendum 2026-10-27 (aprobado por Alfredo)
+Complementa las reglas anteriores; en caso de conflicto prevalece este addendum para tareas nuevas.
+
+1. Roles: Hermes actúa sólo como router (asigna y registra, no implementa). Claude Code es el único worker.
+2. Codex: sólo revisión expresamente autorizada por Alfredo, en sandbox read-only. Nunca executor ni implementador.
+3. Executor o modelo `desconocido`: DETENERSE y pedir autorización explícita de Alfredo antes de continuar.
+4. Toda tarea material registra: repositorio, worktree (ruta absoluta), rama, base/HEAD, worker, revisor, estado y `deploy_autorizado=false` (sólo cambia con OK de Alfredo según punto 5).
+5. Push, merge, deploy, migración, manejo de secretos, publicación, firma o cambios on-chain requieren OK textual y específico de Alfredo para esa acción concreta. Una aprobación no se extiende a otras acciones ni tareas.
+6. Este addendum no modifica entradas históricas del Registro ni de Overrides; rige hacia adelante.
